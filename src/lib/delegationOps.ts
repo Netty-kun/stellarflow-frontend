@@ -95,3 +95,85 @@ export async function submitDelegation(
 
   return response.hash;
 }
+
+/**
+ * Submits a transaction to revoke delegation, restoring direct voting rights.
+ *
+ * @param delegateAddress - The Stellar public key of the delegate to revoke from
+ * @returns The transaction hash on success
+ */
+export async function revokeDelegation(
+  delegateAddress: string,
+): Promise<string> {
+  const { isConnected, getAddress } = await import('@stellar/freighter-api');
+  const {
+    TransactionBuilder,
+    Networks,
+    Operation,
+    Asset,
+  } = await import('@stellar/stellar-sdk');
+
+  if (!delegateAddress || !delegateAddress.startsWith('G')) {
+    throw new Error('Invalid delegate address.');
+  }
+
+  if (!(await isConnected())) {
+    throw new Error(
+      'Freighter wallet is not connected. Please connect your wallet first.',
+    );
+  }
+
+  const { address: publicKey } = await getAddress();
+  if (!publicKey) {
+    throw new Error('Could not retrieve public key from Freighter.');
+  }
+
+  const Horizon = (await import('@stellar/stellar-sdk')).Horizon;
+  const server = new Horizon.Server('https://horizon-testnet.stellar.org');
+
+  const account = await server.loadAccount(publicKey);
+  const fee = await server.fetchBaseFee();
+
+  const txBuilder = new TransactionBuilder(account, {
+    fee: fee.toString(),
+    networkPassphrase: Networks.TESTNET,
+  });
+
+  // Minimum payment back to sender to hold the delegate:revoke memo on-chain
+  txBuilder.addOperation(
+    Operation.payment({
+      destination: publicKey,
+      asset: Asset.native(),
+      amount: '0.0000001',
+    }),
+  );
+
+  txBuilder.setTimeout(60);
+  txBuilder.addMemo(
+    (await import('@stellar/stellar-sdk')).Memo.text('delegate:revoke'),
+  );
+
+  const tx = txBuilder.build();
+
+  const { signTransaction } = await import('@stellar/freighter-api');
+  const { signedTxXdr, error } = await signTransaction(tx.toXDR(), {
+    networkPassphrase: Networks.TESTNET,
+  });
+
+  if (error || !signedTxXdr) {
+    throw new Error('Transaction signing failed or was canceled.');
+  }
+
+  const signedTx = TransactionBuilder.fromXDR(
+    signedTxXdr,
+    Networks.TESTNET,
+  );
+
+  const response = await server.submitTransaction(signedTx);
+
+  if (!response.successful) {
+    throw new Error('Revocation transaction failed on the network.');
+  }
+
+  return response.hash;
+}

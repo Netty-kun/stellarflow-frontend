@@ -20,6 +20,7 @@ export function ContactBookModal({ isOpen, onClose, onSelectContact }: ContactBo
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [newContact, setNewContact] = useState<Partial<Contact>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('stellarflow-contacts');
@@ -39,10 +40,18 @@ export function ContactBookModal({ isOpen, onClose, onSelectContact }: ContactBo
 
   const handleAdd = () => {
     if (!newContact.alias || !newContact.address) return;
+    const exists = contacts.some(
+      c => c.alias.trim().toLowerCase() === newContact.alias?.trim().toLowerCase()
+    );
+    if (exists) {
+      setError("This alias is already taken. Please choose a unique name.");
+      return;
+    }
+    setError(null);
     const contact: Contact = {
       id: crypto.randomUUID(),
-      alias: newContact.alias,
-      address: newContact.address,
+      alias: newContact.alias.trim(),
+      address: newContact.address.trim(),
       bankAccount: newContact.bankAccount || '',
       memo: newContact.memo || '',
     };
@@ -129,6 +138,11 @@ export function ContactBookModal({ isOpen, onClose, onSelectContact }: ContactBo
           {isAdding && (
             <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
               <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Add New Contact</h3>
+              {error && (
+                <div className="mb-4 text-xs font-semibold text-red-500 bg-red-50 dark:bg-red-950/20 p-2.5 rounded-lg border border-red-500/20">
+                  {error}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <input
                   type="text"
@@ -160,7 +174,7 @@ export function ContactBookModal({ isOpen, onClose, onSelectContact }: ContactBo
                 />
               </div>
               <div className="mt-4 flex justify-end gap-2">
-                <button onClick={() => setIsAdding(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Cancel</button>
+                <button onClick={() => { setIsAdding(false); setNewContact({}); setError(null); }} className="px-4 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Cancel</button>
                 <button onClick={handleAdd} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Save Contact</button>
               </div>
             </div>
