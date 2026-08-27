@@ -16,6 +16,13 @@ import { SwUpdateBanner } from "@/components/pwa/SwUpdateBanner";
 import { ScreenLockProvider } from "@/components/security/ScreenLockModal";
 import { headers } from "next/headers";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
+import { OfflineBanner } from "./components/OfflineBanner";
+import dynamic from "next/dynamic";
+
+const NetworkStatusBar = dynamic(
+  () => import("@/components/network/NetworkStatusBar").then((m) => m.NetworkStatusBar),
+  { ssr: false },
+);
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -145,6 +152,7 @@ export default async function RootLayout({
                   </ToastProvider>
                   <SwUpdateBanner />
                   <InstallBanner />
+                  <NetworkStatusBar />
               </ProgressBarProvider>
             </QueryProvider>
           </UserProvider>

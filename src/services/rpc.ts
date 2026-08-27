@@ -1,11 +1,21 @@
-type SorobanServer = InstanceType<
-  Awaited<typeof import('@stellar/stellar-sdk')>['SorobanRpc']['Server']
->;
+import {
+  DEFAULT_RPC_NODES,
+  type StellarRpcNode,
+  type NetworkTarget,
+} from '../config/rpcNodes';
+
+export type SorobanServerLike = {
+  readonly serverURL: string;
+  [key: string]: unknown;
+};
 
 export interface RpcEndpointConfig {
+  id?: string;
+  name?: string;
   url: string;
   priority: number;
-  network: 'testnet' | 'mainnet';
+  network: NetworkTarget;
+  type?: 'soroban' | 'horizon' | 'hybrid';
 }
 
 export interface RpcLatencyRecord {
@@ -22,43 +32,70 @@ interface LatencyEntry {
   lastError: string | null;
 }
 
-const DEFAULT_ENDPOINTS: RpcEndpointConfig[] = [
-  { url: 'https://soroban-testnet.stellar.org', priority: 1, network: 'testnet' },
-  { url: 'https://soroban-rpc.mainnet.stellar.org', priority: 1, network: 'mainnet' },
-];
+const DEFAULT_ENDPOINTS: RpcEndpointConfig[] = DEFAULT_RPC_NODES.map((node, index) => ({
+  id: node.id,
+  name: node.name,
+  url: node.url,
+  priority: node.isDefault ? 1 : index + 2,
+  network: node.network,
+  type: node.type,
+}));
 
 export class RpcManager {
   private endpoints: RpcEndpointConfig[] = [];
-  private servers: Map<string, SorobanServer> = new Map();
+  private servers: Map<string, SorobanServerLike> = new Map();
   private currentUrl: string;
   private latencies: Map<string, LatencyEntry> = new Map();
-  private stellarSdk: Awaited<typeof import('@stellar/stellar-sdk')> | null = null;
+  private stellarSdk: unknown = null;
 
   constructor(endpoints?: RpcEndpointConfig[]) {
     this.endpoints = (endpoints ?? DEFAULT_ENDPOINTS).sort((a, b) => a.priority - b.priority);
     this.currentUrl = this.endpoints[0]?.url ?? '';
   }
 
-  private async getSdk(): Promise<Awaited<typeof import('@stellar/stellar-sdk')>> {
+  private async getSdk(): Promise<any> {
     if (!this.stellarSdk) {
       this.stellarSdk = await import('@stellar/stellar-sdk');
     }
     return this.stellarSdk;
   }
 
-  async getServer(url?: string): Promise<SorobanServer> {
+  async getServer(url?: string): Promise<SorobanServerLike> {
     const targetUrl = url ?? this.currentUrl;
     let server = this.servers.get(targetUrl);
     if (!server) {
-      const { SorobanRpc } = await this.getSdk();
-      server = new SorobanRpc.Server(targetUrl, { allowHttp: true });
-      this.servers.set(targetUrl, server);
+      const sdk = await this.getSdk();
+      const ServerClass = sdk.rpc?.Server ?? sdk.SorobanRpc?.Server;
+      if (ServerClass) {
+        server = new ServerClass(targetUrl, { allowHttp: true });
+        this.servers.set(targetUrl, server as SorobanServerLike);
+      } else {
+        server = { serverURL: targetUrl } as SorobanServerLike;
+        this.servers.set(targetUrl, server);
+      }
     }
-    return server;
+    return server as SorobanServerLike;
   }
 
   getCurrentEndpoint(): RpcEndpointConfig | undefined {
     return this.endpoints.find((e) => e.url === this.currentUrl);
+  }
+
+  setCurrentEndpoint(url: string): boolean {
+    const existing = this.endpoints.find((e) => e.url === url);
+    if (existing) {
+      this.currentUrl = url;
+      return true;
+    }
+    // If not registered, add it dynamically
+    this.endpoints.unshift({
+      url,
+      priority: 0,
+      network: 'testnet',
+      name: 'Custom Node',
+    });
+    this.currentUrl = url;
+    return true;
   }
 
   isRetryableError(error: unknown): boolean {
@@ -83,13 +120,20 @@ export class RpcManager {
     );
   }
 
-  private failover(): void {
-    const currentIdx = this.endpoints.findIndex((e) => e.url === this.currentUrl);
-    const nextIdx = (currentIdx + 1) % this.endpoints.length;
-    this.currentUrl = this.endpoints[nextIdx].url;
+  failover(network?: NetworkTarget): string {
+    const filtered = network
+      ? this.endpoints.filter((e) => e.network === network)
+      : this.endpoints;
+
+    if (filtered.length === 0) return this.currentUrl;
+
+    const currentIdx = filtered.findIndex((e) => e.url === this.currentUrl);
+    const nextIdx = (currentIdx + 1) % filtered.length;
+    this.currentUrl = filtered[nextIdx].url;
+    return this.currentUrl;
   }
 
-  private recordLatency(url: string, durationMs: number, error: string | null): void {
+  recordLatency(url: string, durationMs: number, error: string | null): void {
     let entry = this.latencies.get(url);
     if (!entry) {
       entry = { samples: [], lastError: null };
@@ -100,13 +144,59 @@ export class RpcManager {
     if (entry.samples.length > 100) {
       entry.samples.shift();
     }
-
-    console.log(
-      `[RpcManager] ${error ? 'FAIL' : 'OK'} ${url} - ${durationMs.toFixed(1)}ms${error ? ` - ${error}` : ''}`,
-    );
   }
 
-  async execute<T>(operation: (server: SorobanServer) => Promise<T>): Promise<T> {
+  /**
+   * Ping any Stellar RPC or Horizon endpoint to measure round-trip latency.
+   */
+  async pingEndpoint(
+    url: string,
+    timeoutMs = 6000,
+  ): Promise<{ latencyMs: number; error: string | null }> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const start = performance.now();
+
+    try {
+      // First try Soroban JSON-RPC getHealth
+      const isHorizon = url.includes('horizon');
+      if (isHorizon) {
+        const res = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } else {
+        const res = await fetch(url, {
+          method: 'POST',
+          signal: controller.signal,
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json().catch(() => null);
+        if (json?.error) {
+          throw new Error(json.error.message ?? 'Soroban RPC error');
+        }
+      }
+
+      const duration = Math.round(performance.now() - start);
+      this.recordLatency(url, duration, null);
+      return { latencyMs: duration, error: null };
+    } catch (err) {
+      const duration = Math.round(performance.now() - start);
+      const errMsg = err instanceof Error ? err.message : 'Ping failed';
+      this.recordLatency(url, duration, errMsg);
+      return { latencyMs: duration, error: errMsg };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async execute<T>(operation: (server: SorobanServerLike) => Promise<T>): Promise<T> {
     const attempts = this.endpoints.length;
     for (let i = 0; i < attempts; i++) {
       const endpoint =
@@ -128,7 +218,7 @@ export class RpcManager {
           console.warn(
             `[RpcManager] Failover from ${endpoint.url} due to: ${errMsg}. Trying next endpoint...`,
           );
-          this.failover();
+          this.failover(endpoint.network);
         } else {
           throw error;
         }
@@ -161,8 +251,11 @@ export class RpcManager {
   }
 
   addEndpoint(config: RpcEndpointConfig): void {
-    this.endpoints.push(config);
-    this.endpoints.sort((a, b) => a.priority - b.priority);
+    const exists = this.endpoints.some((e) => e.url === config.url);
+    if (!exists) {
+      this.endpoints.push(config);
+      this.endpoints.sort((a, b) => a.priority - b.priority);
+    }
   }
 
   removeEndpoint(url: string): void {
