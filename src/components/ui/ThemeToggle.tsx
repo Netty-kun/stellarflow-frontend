@@ -28,7 +28,7 @@ export function ThemeToggle({ className = "", size = 20 }: ThemeToggleProps) {
     return (
       <span
         aria-hidden
-        style={{ display: "inline-block", width: size, height: size }}
+        style={{ display: "inline-block", width: size + 12, height: size + 12 }}
       />
     );
   }
