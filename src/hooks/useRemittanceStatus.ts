@@ -15,18 +15,16 @@ import { useErrorTimeout } from "@/app/hooks/useErrorTimeout";
  * The numeric order is intentional — comparison helpers rely on it.
  */
 export type RemittanceStep =
-  | "deposited"
-  | "swap_completed"
-  | "anchor_processing"
-  | "offramp_dispatched"
-  | "delivered";
+  | "payment_initiated"
+  | "escrow_locked"
+  | "anchor_dispatched"
+  | "fiat_received";
 
 export const REMITTANCE_STEPS: RemittanceStep[] = [
-  "deposited",
-  "swap_completed",
-  "anchor_processing",
-  "offramp_dispatched",
-  "delivered",
+  "payment_initiated",
+  "escrow_locked",
+  "anchor_dispatched",
+  "fiat_received",
 ];
 
 /**
@@ -37,6 +35,7 @@ export interface RemittanceStepMeta {
   step: RemittanceStep;
   completedAt?: string; // ISO 8601
   txHash?: string;      // Stellar transaction hash for block explorer link
+  anchorTrackingUrl?: string; // Direct link to anchor tracking reference
 }
 
 export type RemittanceStatusPhase =
@@ -172,7 +171,7 @@ export function useRemittanceStatus(
   const isTerminal =
     status?.phase === "completed" ||
     status?.phase === "failed" ||
-    (stopOnDelivered && status?.currentStep === "delivered");
+    (stopOnDelivered && status?.currentStep === "fiat_received");
 
   // ------------------------------------------------------------------
   // applyUpdate — merge an incoming payload into state

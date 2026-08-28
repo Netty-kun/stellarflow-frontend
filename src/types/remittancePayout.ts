@@ -13,6 +13,7 @@ export interface RemittancePayoutRecord {
   anchorReference: string;
   senderName: string;
   recipientName: string;
+  recipientAddress?: string;
   amountSent: number;
   sentCurrency: string;
   amountReceived: number;

@@ -137,6 +137,9 @@ interface DelegateCardProps {
   onDelegate: (delegate: DelegateWithShortAddress) => void;
   isDelegating: boolean;
   walletConnected: boolean;
+  isActiveDelegate: boolean;
+  onRevoke: (delegate: DelegateWithShortAddress) => void;
+  isRevoking: boolean;
 }
 
 const DelegateCard = React.memo(function DelegateCard({
@@ -144,6 +147,9 @@ const DelegateCard = React.memo(function DelegateCard({
   onDelegate,
   isDelegating,
   walletConnected,
+  isActiveDelegate,
+  onRevoke,
+  isRevoking,
 }: DelegateCardProps) {
   const [showHistory, setShowHistory] = useState(false);
 
@@ -169,8 +175,14 @@ const DelegateCard = React.memo(function DelegateCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-lg font-semibold text-gray-100 group-hover:text-blue-400 transition-colors duration-150">
+              <h3 className="text-lg font-semibold text-gray-100 group-hover:text-blue-400 transition-colors duration-150 flex items-center gap-2">
                 {delegate.name}
+                {isActiveDelegate && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-950/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Active
+                  </span>
+                )}
               </h3>
               {delegate.tags.slice(0, 3).map((tag) => (
                 <TagBadge key={tag} tag={tag} />
@@ -226,20 +238,36 @@ const DelegateCard = React.memo(function DelegateCard({
               : `Voting history (${delegate.votingHistory.length})`}
           </button>
 
-          <button
-            onClick={() => onDelegate(delegate)}
-            disabled={isDelegating || !walletConnected}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              transition: "transform 150ms ease, box-shadow 150ms ease",
-            }}
-          >
-            <span className="absolute inset-0 bg-blue-700 opacity-0 hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
-            <span className="relative z-10 flex items-center gap-2">
-              <Icon id={ICON_IDS.key} size={14} />
-              {isDelegating ? "Delegating..." : "Delegate"}
-            </span>
-          </button>
+          {isActiveDelegate ? (
+            <button
+              onClick={() => onRevoke(delegate)}
+              disabled={isRevoking || !walletConnected}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                transition: "transform 150ms ease, box-shadow 150ms ease",
+              }}
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                <Icon id={ICON_IDS.xCircle} size={14} />
+                {isRevoking ? "Revoking..." : "Revoke"}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onDelegate(delegate)}
+              disabled={isDelegating || !walletConnected}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                transition: "transform 150ms ease, box-shadow 150ms ease",
+              }}
+            >
+              <span className="absolute inset-0 bg-blue-700 opacity-0 hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
+              <span className="relative z-10 flex items-center gap-2">
+                <Icon id={ICON_IDS.key} size={14} />
+                {isDelegating ? "Delegating..." : "Delegate"}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Expandable voting history */}
@@ -270,7 +298,9 @@ const DelegateCard = React.memo(function DelegateCard({
 (prev, next) =>
   prev.delegate.id === next.delegate.id &&
   prev.isDelegating === next.isDelegating &&
-  prev.walletConnected === next.walletConnected,
+  prev.walletConnected === next.walletConnected &&
+  prev.isActiveDelegate === next.isActiveDelegate &&
+  prev.isRevoking === next.isRevoking,
 );
 DelegateCard.displayName = "DelegateCard";
 
@@ -469,7 +499,15 @@ function DelegateDirectoryContent({
   const [selectedDelegate, setSelectedDelegate] =
     useState<DelegateWithShortAddress | null>(null);
   const [isDelegating, setIsDelegating] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [activeDelegateAddress, setActiveDelegateAddress] = useState<string | null>(null);
   const timeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setActiveDelegateAddress(localStorage.getItem("stellarflow-active-delegation"));
+    }
+  }, []);
 
   const debouncedSearch = useDebounce(searchTerm, 200);
 
@@ -559,6 +597,8 @@ function DelegateDirectoryContent({
 
         // Refresh wallet state to reflect changes
         await refreshWalletState();
+        localStorage.setItem("stellarflow-active-delegation", selectedDelegate.address);
+        setActiveDelegateAddress(selectedDelegate.address);
         setSelectedDelegate(null);
 
         const timer = setTimeout(() => {
@@ -577,6 +617,50 @@ function DelegateDirectoryContent({
       }
     },
     [selectedDelegate, addToast, updateToast, refreshWalletState],
+  );
+
+  const handleRevokeDelegation = useCallback(
+    async (delegate: DelegateWithShortAddress) => {
+      setIsRevoking(true);
+
+      const toastId = addToast({
+        title: "Revocation submitted",
+        description: `Revoking voting power delegation from ${delegate.name}.`,
+        status: "submitted",
+      });
+
+      try {
+        const { revokeDelegation } = await import("@/lib/delegationOps");
+        updateToast(toastId, {
+          status: "processing",
+          title: "Transaction processing",
+          description: "Awaiting Freighter signature...",
+        });
+
+        const txHash = await revokeDelegation(delegate.address);
+
+        updateToast(toastId, {
+          status: "confirmed",
+          title: "Delegation revoked",
+          description: `Successfully restored direct voting rights.`,
+          txHash,
+        });
+
+        localStorage.removeItem("stellarflow-active-delegation");
+        setActiveDelegateAddress(null);
+        await refreshWalletState();
+      } catch (err) {
+        updateToast(toastId, {
+          status: "failed",
+          title: "Revocation failed",
+          description:
+            err instanceof Error ? err.message : "Transaction could not be completed.",
+        });
+      } finally {
+        setIsRevoking(false);
+      }
+    },
+    [addToast, updateToast, refreshWalletState],
   );
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -667,6 +751,9 @@ function DelegateDirectoryContent({
               onDelegate={handleDelegateClick}
               isDelegating={isDelegating && selectedDelegate?.id === delegate.id}
               walletConnected={wallet?.connected ?? false}
+              isActiveDelegate={activeDelegateAddress === delegate.address}
+              onRevoke={handleRevokeDelegation}
+              isRevoking={isRevoking}
             />
           ))}
         </div>
