@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Icon from '@/components/icons/Icon';
 import { ICON_IDS } from '@/components/icons/iconIds';
 import { CONTRACT_HEALTH_ICON_VARIANTS } from '@/lib/classNameVariants';
+import StorageFootprintCalculator from '@/components/contracts/StorageFootprintCalculator';
 
 export default function ContractsPage() {
   const [isHalted, setIsHalted] = useState(false);
@@ -24,9 +25,9 @@ export default function ContractsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 p-8">
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 p-8 space-y-8">
       {/* --- Header Section --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <p className="text-sm text-gray-500 mb-1">Admin / Infrastructure</p>
           <h1 className="text-3xl font-bold tracking-tight">Smart Contract Logic</h1>
@@ -38,6 +39,9 @@ export default function ContractsPage() {
           </div>
         </div>
       </div>
+
+      {/* --- Storage Footprint & Rent Calculator Section (#772) --- */}
+      <StorageFootprintCalculator />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         

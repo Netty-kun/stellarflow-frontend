@@ -24,6 +24,15 @@ export function formatUSD(amount: number): string {
   }).format(amount);
 }
 
+export function formatCountdown(remainingSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(remainingSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  return [hours, minutes, secs].map((part) => String(part).padStart(2, "0")).join(":");
+}
+
 export function formatStroops(stroops: string): string {
   const stroopValue = BigInt(stroops);
   const xlmValue = Number(stroopValue) / 10_000_000;
@@ -32,20 +41,3 @@ export function formatStroops(stroops: string): string {
     maximumFractionDigits: 7,
   });
 }
-
-export function formatCountdown(seconds: number): string {
-  if (seconds <= 0) return "0s";
-  const d = Math.floor(seconds / (3600 * 24));
-  const h = Math.floor((seconds % (3600 * 24)) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-
-  const parts = [];
-  if (d > 0) parts.push(`${d}d`);
-  if (h > 0) parts.push(`${h}h`);
-  if (m > 0) parts.push(`${m}m`);
-  if (s > 0 || parts.length === 0) parts.push(`${s}s`);
-
-  return parts.join(" ");
-}
-

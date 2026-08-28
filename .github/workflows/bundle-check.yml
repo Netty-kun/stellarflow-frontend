@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
   actions: read
 
@@ -301,7 +302,7 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
 
       - name: Comment PR with bundle report
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           script: |
@@ -342,19 +343,21 @@ jobs:
         id: threshold
         run: |
           node -e "
-          const summary = JSON.parse(require('fs').readFileSync('bundle-summary.json', 'utf8'));
-          const THRESHOLD_KB = 200;
+          const report = JSON.parse(require('fs').readFileSync('.bundle-report.json', 'utf8'));
+          const THRESHOLD_KB = report.limits?.maxIndividualGzipped || 200;
+          const exceeding = (report.bundles || []).filter(
+            (bundle) => bundle.gzipped > THRESHOLD_KB && !bundle.name.includes('main')
+          );
 
-          if (summary.exceeding && summary.exceeding.length > 0) {
-            const messages = summary.exceeding.map(
-              function (p) { return '  - ' + p.page + ': ' + p.sizeKB + ' KB (max: ' + THRESHOLD_KB + ' KB)'; }
-            );
+          if (exceeding.length > 0) {
             console.error('FAIL: Bundle size threshold exceeded!');
-            console.error('The following page chunks exceed ' + THRESHOLD_KB + ' KB:');
-            messages.forEach(function (m) { console.error(m); });
+            console.error('The following page chunks exceed ' + THRESHOLD_KB + ' KB gzipped:');
+            exceeding.forEach(function (bundle) {
+              console.error('  - ' + bundle.name + ': ' + bundle.gzipped + ' KB (max: ' + THRESHOLD_KB + ' KB)');
+            });
             process.exit(1);
           } else {
-            console.log('All page chunks are within the ' + THRESHOLD_KB + ' KB threshold.');
+            console.log('All page chunks are within the ' + THRESHOLD_KB + ' KB gzipped threshold.');
           }
           "
 

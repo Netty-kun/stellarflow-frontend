@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries } from 'lightweight-charts';
 
 export type Timeframe = '1H' | '24H' | '7D' | '1M';
 

@@ -59,7 +59,7 @@ export interface CancelOrderResult {
 
 async function waitForTransaction(
   server: InstanceType<
-    Awaited<typeof import("@stellar/stellar-sdk")>["SorobanRpc"]["Server"]
+    Awaited<typeof import("@stellar/stellar-sdk/rpc")>["Server"]
   >,
   hash: string,
 ): Promise<void> {
@@ -97,11 +97,11 @@ export async function submitLimitOrder(
   const {
     Contract,
     Networks,
-    SorobanRpc,
     TransactionBuilder,
     nativeToScVal,
     Transaction,
   } = await import("@stellar/stellar-sdk");
+  const { Server } = await import("@stellar/stellar-sdk/rpc");
 
   if (!(await isConnected())) {
     throw new Error(
@@ -114,7 +114,7 @@ export async function submitLimitOrder(
     throw new Error("Could not retrieve public key from Freighter.");
   }
 
-  const rpcServer = new SorobanRpc.Server(SOROBAN_RPC_URL, {
+  const rpcServer = new Server(SOROBAN_RPC_URL, {
     allowHttp: true,
   });
   const contract = new Contract(params.contractId);
@@ -152,7 +152,7 @@ export async function submitLimitOrder(
   const signedTx = TransactionBuilder.fromXDR(
     signedTxXdr,
     Networks.TESTNET,
-  ) as Transaction;
+  );
 
   const submitResponse = await rpcServer.sendTransaction(signedTx);
 
@@ -184,11 +184,11 @@ export async function cancelLimitOrder(
   const {
     Contract,
     Networks,
-    SorobanRpc,
     TransactionBuilder,
     nativeToScVal,
     Transaction,
   } = await import("@stellar/stellar-sdk");
+  const { Server } = await import("@stellar/stellar-sdk/rpc");
 
   if (!(await isConnected())) {
     throw new Error(
@@ -201,7 +201,7 @@ export async function cancelLimitOrder(
     throw new Error("Could not retrieve public key from Freighter.");
   }
 
-  const rpcServer = new SorobanRpc.Server(SOROBAN_RPC_URL, {
+  const rpcServer = new Server(SOROBAN_RPC_URL, {
     allowHttp: true,
   });
   const contract = new Contract(params.contractId);
@@ -234,7 +234,7 @@ export async function cancelLimitOrder(
   const signedTx = TransactionBuilder.fromXDR(
     signedTxXdr,
     Networks.TESTNET,
-  ) as Transaction;
+  );
 
   const submitResponse = await rpcServer.sendTransaction(signedTx);
 

@@ -1,5 +1,5 @@
 type SorobanServer = InstanceType<
-  Awaited<typeof import('@stellar/stellar-sdk')>['SorobanRpc']['Server']
+  Awaited<typeof import('@stellar/stellar-sdk/rpc')>['Server']
 >;
 
 export interface RpcEndpointConfig {
@@ -50,8 +50,8 @@ export class RpcManager {
     const targetUrl = url ?? this.currentUrl;
     let server = this.servers.get(targetUrl);
     if (!server) {
-      const { SorobanRpc } = await this.getSdk();
-      server = new SorobanRpc.Server(targetUrl, { allowHttp: true });
+      const { Server } = await import('@stellar/stellar-sdk/rpc');
+      server = new Server(targetUrl, { allowHttp: true });
       this.servers.set(targetUrl, server);
     }
     return server;

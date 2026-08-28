@@ -8,6 +8,7 @@ import { useRafThrottle } from '../hooks/useRafThrottle';
 import { openPushPreferencesModal } from '@/components/notifications';
 import { loadPreferences } from '@/services/notifications';
 import { useTransactionAudio } from '@/hooks/useTransactionAudio';
+import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useScreenLock, ScreenLockModal } from '@/components/security/ScreenLockModal';
 import { useTransactionHistoryWithFallback } from '@/app/hooks/useTransactionHistory';
 import { exportTransactionsToCsv, type TaxPlatform } from '@/utils/csvExport';
@@ -45,6 +46,13 @@ export default function SettingsPage() {
     setSoundPack,
     playPreview,
   } = useTransactionAudio();
+  const {
+    isEnabled: hapticsEnabled,
+    toggle: toggleHaptics,
+    triggerTap: testHapticTap,
+    triggerTxConfirm: testHapticTx,
+    isSupported: hapticsSupported,
+  } = useHapticFeedback();
   const { isPinSet, isLocked, idleTimeoutMinutes, lockNow } = useScreenLock();
   const { data: transactions } = useTransactionHistoryWithFallback();
   const { addToast, updateToast } = useToast();
@@ -275,6 +283,41 @@ export default function SettingsPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+            <ToggleItem
+              icon={<Icon id={ICON_IDS.smartphone} size={18} />}
+              title="Haptic Feedback"
+              description="Deliver tactile vibration cues on button taps, slider adjustments, and transaction confirmations on mobile devices."
+              enabled={hapticsEnabled}
+              onToggle={toggleHaptics}
+            />
+            {hapticsEnabled && (
+              <div className="pl-12 pr-3 py-3 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-gray-300">Tactile Vibration Preview</p>
+                  <p className="text-xs text-gray-500">
+                    {hapticsSupported
+                      ? 'Vibration API active on this mobile device.'
+                      : 'Web Vibration API active (cues activate on supported mobile devices).'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => testHapticTap(true)}
+                    className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg border border-gray-700 transition-colors font-medium"
+                  >
+                    Tap Pulse (12ms)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => testHapticTx(true)}
+                    className="px-3 py-1.5 text-xs bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg border border-blue-500/30 transition-colors font-medium"
+                  >
+                    Double Pulse
+                  </button>
                 </div>
               </div>
             )}

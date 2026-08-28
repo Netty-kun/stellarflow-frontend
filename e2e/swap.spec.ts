@@ -22,8 +22,9 @@ test.describe('StellarFlow User Swap Journey (Issue #564)', () => {
     // Verify main swap container loads
     await expect(page.locator('body')).toBeVisible();
 
-    // Select token input or swap interface element
-    const swapContainer = page.locator('main, [role="main"], #__next, body');
+    // Select the primary app container without triggering strict-mode
+    // collisions from multiple matching <main> landmarks.
+    const swapContainer = page.locator('main').last();
     await expect(swapContainer).toBeVisible();
 
     // Check for Connect Wallet or Swap action buttons

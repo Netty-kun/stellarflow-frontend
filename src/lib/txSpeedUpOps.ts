@@ -177,15 +177,16 @@ export async function fetchLedgerTxStatus(
 function readSorobanFootprint(
   tx: Transaction,
 ): xdr.SorobanTransactionData | undefined {
-  const envelope = tx.toEnvelope();
-  // Only the v1 envelope shape carries the `ext` union that holds Soroban data.
-  if (envelope.switch().name !== "envelopeTypeTx") {
+  const envelope = tx.toEnvelope() as unknown as {
+    switch?: () => { name?: string };
+    v1?: () => { tx?: () => { ext?: () => { value?: () => xdr.SorobanTransactionData } } };
+  };
+
+  if (envelope.switch?.().name !== "envelopeTypeTx") {
     return undefined;
   }
-  const footprint = envelope.v1().tx().ext().value() as
-    | xdr.SorobanTransactionData
-    | undefined;
-  return footprint ?? undefined;
+
+  return envelope.v1?.().tx?.().ext?.().value?.();
 }
 
 /**
@@ -210,7 +211,10 @@ export async function inspectTransaction(
 
   const footprint = readSorobanFootprint(inner);
   const resourceFeeStroops = footprint
-    ? Number(footprint.resourceFee().toBigInt())
+    ? Number(
+        (footprint as { resourceFee?: { toBigInt?: () => bigint } }).resourceFee
+          ?.toBigInt?.() ?? 0,
+      )
     : 0;
   // Guard against a malformed envelope claiming more resource fee than it bid.
   const inclusionFeeStroops = Math.max(0, totalFeeStroops - resourceFeeStroops);

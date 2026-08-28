@@ -60,7 +60,7 @@ async function buildDemoEnvelope(
   tx.sign(source);
 
   return {
-    hash: tx.hash().toString("hex"),
+    hash: Buffer.from(tx.hash()).toString("hex"),
     xdr: tx.toXDR(),
     submittedAt: Date.now() - ageMs,
   };

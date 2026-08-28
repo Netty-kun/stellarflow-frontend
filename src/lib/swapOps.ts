@@ -32,7 +32,7 @@ export interface SwapResult {
 
 async function waitForTransaction(
   server: InstanceType<
-    Awaited<typeof import('@stellar/stellar-sdk')>['SorobanRpc']['Server']
+    Awaited<typeof import('@stellar/stellar-sdk/rpc')>['Server']
   >,
   hash: string,
 ): Promise<void> {
@@ -72,11 +72,10 @@ export async function submitSwap({
     Address,
     Contract,
     Networks,
-    SorobanRpc,
     TransactionBuilder,
     nativeToScVal,
-    Transaction,
   } = await import('@stellar/stellar-sdk');
+  const { Server } = await import('@stellar/stellar-sdk/rpc');
 
   if (!(await isConnected())) {
     throw new Error('Freighter wallet is not connected. Please connect your wallet first.');
@@ -87,7 +86,7 @@ export async function submitSwap({
     throw new Error('Could not retrieve public key from Freighter.');
   }
 
-  const rpcServer = new SorobanRpc.Server(SOROBAN_RPC_URL, { allowHttp: true });
+  const rpcServer = new Server(SOROBAN_RPC_URL, { allowHttp: true });
   const contract = new Contract(contractId);
 
   const sourceAccount = await rpcServer.getAccount(publicKey);
@@ -122,7 +121,7 @@ export async function submitSwap({
   const signedTx = TransactionBuilder.fromXDR(
     signedTxXdr,
     Networks.TESTNET,
-  ) as InstanceType<typeof Transaction>;
+  );
 
   const submitResponse = await rpcServer.sendTransaction(signedTx);
 

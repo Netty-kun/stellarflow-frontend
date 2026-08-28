@@ -21,7 +21,7 @@ const getTransition = (shouldReduceMotion: boolean) => ({
 
 export function PageTransition({ children, className }: PageTransitionProps) {
   const pathname = usePathname();
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = Boolean(useReducedMotion());
 
   const variants: Variants = {
     initial: {
@@ -64,10 +64,17 @@ export function AnimatedActionButton({
   type = "button",
   ...props
 }: AnimatedActionButtonProps) {
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = Boolean(useReducedMotion());
+  const MotionButton = motion.button as unknown as React.ComponentType<
+    React.ButtonHTMLAttributes<HTMLButtonElement> & {
+      whileHover?: unknown;
+      whileTap?: unknown;
+      transition?: unknown;
+    }
+  >;
 
   return (
-    <motion.button
+    <MotionButton
       type={type}
       className={className}
       whileHover={shouldReduceMotion ? undefined : { y: -2, scale: 1.01 }}
@@ -76,6 +83,6 @@ export function AnimatedActionButton({
       {...props}
     >
       {children}
-    </motion.button>
+    </MotionButton>
   );
 }
