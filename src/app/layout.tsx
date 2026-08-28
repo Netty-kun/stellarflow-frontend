@@ -14,6 +14,7 @@ import { SecurityBanner } from "@/components/navigation/SecurityBanner";
 import { InstallBanner } from "./components/InstallBanner";
 import { SwUpdateBanner } from "@/components/pwa/SwUpdateBanner";
 import { ScreenLockProvider } from "@/components/security/ScreenLockModal";
+import { GasFeeProvider } from "@/components/gas-fee";
 import { headers } from "next/headers";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
 
@@ -139,9 +140,11 @@ export default async function RootLayout({
             <QueryProvider>
               <ProgressBarProvider>
                   <ToastProvider>
-                    <ErrorBoundary tags={{ section: "root" }}>
-                      <ScreenLockProvider>{children}</ScreenLockProvider>
-                    </ErrorBoundary>
+                    <GasFeeProvider>
+                      <ErrorBoundary tags={{ section: "root" }}>
+                        <ScreenLockProvider>{children}</ScreenLockProvider>
+                      </ErrorBoundary>
+                    </GasFeeProvider>
                   </ToastProvider>
                   <SwUpdateBanner />
                   <InstallBanner />
