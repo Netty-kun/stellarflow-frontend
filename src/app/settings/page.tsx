@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/ToastQueue';
 import { useDashboardCustomizer } from '@/components/dashboard/useDashboardCustomizer';
 import { WalletNonceResync } from '@/components/wallet/WalletNonceResync';
 import { useZKProofLoader } from '@/components/zk/useZKProofLoader';
+import { useThemeContext, type Theme } from '@/context/ThemeContext';
 
 interface Settings {
   emailReports: boolean;
@@ -60,6 +61,7 @@ export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const { openCustomizer, Customizer } = useDashboardCustomizer();
   const { Loader: ZKProofLoader, startProofGeneration } = useZKProofLoader();
+  const { theme: currentTheme, setTheme: setThemePreference, mounted: themeMounted } = useThemeContext();
   const [settings, setSettings] = useState<Settings>({
     emailReports: true,
     pushNotifications: false,
@@ -167,6 +169,51 @@ export default function SettingsPage() {
               <label className="text-xs text-gray-500 uppercase font-bold">Admin Role</label>
               <input type="text" defaultValue="Lead Trainer / Developer" disabled className="w-full bg-[#0d1117] border border-gray-800 rounded-md py-2 px-3 text-sm text-gray-500 cursor-not-allowed" />
             </div>
+          </div>
+        </section>
+
+        <section className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+            <Icon id={ICON_IDS.sun} size={20} className="text-yellow-400" />
+            Appearance
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-gray-200">Theme Preference</p>
+              <p className="text-xs text-gray-500 mb-4">Choose how StellarFlow looks. "System" automatically matches your OS color scheme.</p>
+            </div>
+            {themeMounted && (
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { value: "light", label: "Light", icon: SunIcon },
+                  { value: "dark", label: "Dark", icon: MoonIcon },
+                  { value: "system", label: "System", icon: MonitorIcon },
+                ] as const).map((option) => {
+                  const isActive = (currentTheme ?? "system") === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setThemePreference(option.value as Theme)}
+                      className={`flex flex-col items-center gap-2 p-4 rounded-lg border transition-all ${
+                        isActive
+                          ? "border-blue-500 bg-blue-600/10 text-blue-400"
+                          : "border-gray-800 bg-[#0d1117]/50 hover:border-gray-700 text-gray-400 hover:text-gray-200"
+                      }`}
+                      aria-pressed={isActive}
+                    >
+                      <option.icon className={isActive ? "text-blue-400" : "text-gray-500"} />
+                      <span className="text-xs font-medium">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-xs text-gray-600">
+              {currentTheme === "system"
+                ? "Currently following your system preference."
+                : `Currently using ${currentTheme} mode.`}
+            </p>
           </div>
         </section>
 
@@ -536,5 +583,31 @@ function ToggleItem({ icon, title, description, enabled, onToggle }: { icon: Rea
         </button>
       </div>
     </div>
+  );
+}
+
+function SunIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  );
+}
+
+function MoonIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function MonitorIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </svg>
   );
 }

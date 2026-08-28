@@ -20,11 +20,15 @@
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import type { ThemeProviderProps } from "next-themes";
 import { ThemeContextProvider } from "@/context/ThemeContext";
+import { SystemThemeSync } from "./SystemThemeSync";
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
     <NextThemesProvider {...props}>
-      <ThemeContextProvider>{children}</ThemeContextProvider>
+      <ThemeContextProvider>
+        <SystemThemeSync />
+        {children}
+      </ThemeContextProvider>
     </NextThemesProvider>
   );
 }
