@@ -17,6 +17,8 @@ import { ScreenLockProvider } from "@/components/security/ScreenLockModal";
 import { headers } from "next/headers";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { HapticProvider } from "@/components/providers/HapticProvider";
+import { PushNotificationRoot } from "@/components/notifications";
+import { RpcFailoverMonitor } from "./components/providers/RpcFailoverMonitor";
 
 export const metadata: Metadata = {
   title: "StellarFlow Network Dashboard",
@@ -136,9 +138,12 @@ export default async function RootLayout({
                 <QueryProvider>
                   <ProgressBarProvider>
                       <ToastProvider>
-                        <ErrorBoundary tags={{ section: "root" }}>
-                          <ScreenLockProvider>{children}</ScreenLockProvider>
-                        </ErrorBoundary>
+                        <RpcFailoverMonitor />
+                        <PushNotificationRoot>
+                          <ErrorBoundary tags={{ section: "root" }}>
+                            <ScreenLockProvider>{children}</ScreenLockProvider>
+                          </ErrorBoundary>
+                        </PushNotificationRoot>
                       </ToastProvider>
                       <SwUpdateBanner />
                       <InstallBanner />

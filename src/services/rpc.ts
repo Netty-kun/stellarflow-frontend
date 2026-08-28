@@ -17,6 +17,14 @@ export interface RpcLatencyRecord {
   lastError: string | null;
 }
 
+export interface RpcFailoverEvent {
+  previousUrl: string;
+  nextUrl: string;
+  reason: string;
+}
+
+type RpcFailoverListener = (event: RpcFailoverEvent) => void;
+
 interface LatencyEntry {
   samples: number[];
   lastError: string | null;
@@ -24,19 +32,29 @@ interface LatencyEntry {
 
 const DEFAULT_ENDPOINTS: RpcEndpointConfig[] = [
   { url: 'https://soroban-testnet.stellar.org', priority: 1, network: 'testnet' },
-  { url: 'https://soroban-rpc.mainnet.stellar.org', priority: 1, network: 'mainnet' },
+  { url: 'https://rpc-testnet.stellar.org', priority: 2, network: 'testnet' },
+  { url: 'https://soroban.stellar.org', priority: 1, network: 'mainnet' },
+  { url: 'https://rpc-mainnet.stellar.org', priority: 2, network: 'mainnet' },
 ];
+
+const FAILOVER_ERROR_THRESHOLD = 3;
+const HEALTH_POLL_INTERVAL_MS = 15_000;
 
 export class RpcManager {
   private endpoints: RpcEndpointConfig[] = [];
   private servers: Map<string, SorobanServer> = new Map();
   private currentUrl: string;
+  private activeNetwork: RpcEndpointConfig['network'];
   private latencies: Map<string, LatencyEntry> = new Map();
+  private consecutiveErrors = 0;
+  private healthTimer: ReturnType<typeof setInterval> | null = null;
+  private listeners = new Set<RpcFailoverListener>();
   private stellarSdk: Awaited<typeof import('@stellar/stellar-sdk')> | null = null;
 
   constructor(endpoints?: RpcEndpointConfig[]) {
     this.endpoints = (endpoints ?? DEFAULT_ENDPOINTS).sort((a, b) => a.priority - b.priority);
     this.currentUrl = this.endpoints[0]?.url ?? '';
+    this.activeNetwork = this.endpoints[0]?.network ?? 'testnet';
   }
 
   private async getSdk(): Promise<Awaited<typeof import('@stellar/stellar-sdk')>> {
@@ -83,10 +101,69 @@ export class RpcManager {
     );
   }
 
-  private failover(): void {
-    const currentIdx = this.endpoints.findIndex((e) => e.url === this.currentUrl);
-    const nextIdx = (currentIdx + 1) % this.endpoints.length;
-    this.currentUrl = this.endpoints[nextIdx].url;
+  private failover(reason: string): void {
+    const previousUrl = this.currentUrl;
+    const routableEndpoints = this.endpoints.filter((endpoint) => endpoint.network === this.activeNetwork);
+    if (routableEndpoints.length < 2) return;
+    const candidates = this.getLatencyStats()
+      .filter((entry) => routableEndpoints.some((endpoint) => endpoint.url === entry.url) && entry.url !== previousUrl && entry.isAvailable)
+      .sort((a, b) => {
+        const aLatency = a.sampleCount > 0 ? a.avgLatency : Number.POSITIVE_INFINITY;
+        const bLatency = b.sampleCount > 0 ? b.avgLatency : Number.POSITIVE_INFINITY;
+        return aLatency - bLatency;
+      });
+    const currentIdx = routableEndpoints.findIndex((e) => e.url === previousUrl);
+    const next = candidates[0] ?? routableEndpoints[(currentIdx + 1) % routableEndpoints.length];
+    if (!next || next.url === previousUrl) return;
+
+    this.currentUrl = next.url;
+    const event = { previousUrl, nextUrl: next.url, reason };
+    this.listeners.forEach((listener) => listener(event));
+  }
+
+  subscribe(listener: RpcFailoverListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  startHealthMonitor(intervalMs = HEALTH_POLL_INTERVAL_MS): () => void {
+    if (this.healthTimer) return () => this.stopHealthMonitor();
+    void this.checkEndpointHealth();
+    this.healthTimer = setInterval(() => void this.checkEndpointHealth(), intervalMs);
+    return () => this.stopHealthMonitor();
+  }
+
+  stopHealthMonitor(): void {
+    if (!this.healthTimer) return;
+    clearInterval(this.healthTimer);
+    this.healthTimer = null;
+  }
+
+  private async checkEndpointHealth(): Promise<void> {
+    await Promise.all(this.endpoints.map(async (endpoint) => {
+      const start = performance.now();
+      try {
+        const response = await fetch(endpoint.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'getHealth' }),
+          signal: AbortSignal.timeout(6_000),
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error(`RPC responded ${response.status}`);
+        const payload = (await response.json()) as { error?: { message?: string } };
+        if (payload.error) throw new Error(payload.error.message ?? 'RPC health check failed');
+        this.recordLatency(endpoint.url, performance.now() - start, null);
+      } catch (error) {
+        this.recordLatency(endpoint.url, performance.now() - start, error instanceof Error ? error.message : String(error));
+      }
+    }));
+
+    const current = this.latencies.get(this.currentUrl);
+    const activeUrls = new Set(this.endpoints.filter((endpoint) => endpoint.network === this.activeNetwork).map((endpoint) => endpoint.url));
+    if (current?.lastError && this.getLatencyStats().some((entry) => activeUrls.has(entry.url) && entry.url !== this.currentUrl && entry.isAvailable)) {
+      this.failover(current.lastError);
+    }
   }
 
   private recordLatency(url: string, durationMs: number, error: string | null): void {
@@ -107,10 +184,11 @@ export class RpcManager {
   }
 
   async execute<T>(operation: (server: SorobanServer) => Promise<T>): Promise<T> {
-    const attempts = this.endpoints.length;
-    for (let i = 0; i < attempts; i++) {
+    const routableEndpoints = this.endpoints.filter((endpoint) => endpoint.network === this.activeNetwork);
+    const maxAttempts = routableEndpoints.length + FAILOVER_ERROR_THRESHOLD;
+    for (let i = 0; i < maxAttempts; i++) {
       const endpoint =
-        this.endpoints.find((e) => e.url === this.currentUrl) ?? this.endpoints[i];
+        routableEndpoints.find((e) => e.url === this.currentUrl) ?? routableEndpoints[i];
       const server = await this.getServer(endpoint.url);
       const startTime = performance.now();
 
@@ -118,17 +196,22 @@ export class RpcManager {
         const result = await operation(server);
         const duration = performance.now() - startTime;
         this.recordLatency(endpoint.url, duration, null);
+        this.consecutiveErrors = 0;
         return result;
       } catch (error: unknown) {
         const duration = performance.now() - startTime;
         const errMsg = error instanceof Error ? error.message : String(error);
         this.recordLatency(endpoint.url, duration, errMsg);
+        this.consecutiveErrors += 1;
 
-        if (this.isRetryableError(error) && i < attempts - 1) {
-          console.warn(
-            `[RpcManager] Failover from ${endpoint.url} due to: ${errMsg}. Trying next endpoint...`,
-          );
-          this.failover();
+        if (this.isRetryableError(error) && this.consecutiveErrors >= FAILOVER_ERROR_THRESHOLD) {
+          this.consecutiveErrors = 0;
+          this.failover(errMsg);
+          console.warn(`[RpcManager] Failover from ${endpoint.url} after ${FAILOVER_ERROR_THRESHOLD} consecutive RPC errors.`);
+          continue;
+        }
+        if (this.isRetryableError(error) && i < maxAttempts - 1) {
+          continue;
         } else {
           throw error;
         }
@@ -170,7 +253,8 @@ export class RpcManager {
     this.servers.delete(url);
     this.latencies.delete(url);
     if (this.currentUrl === url) {
-      this.currentUrl = this.endpoints[0]?.url ?? '';
+      const next = this.endpoints.find((endpoint) => endpoint.network === this.activeNetwork);
+      this.currentUrl = next?.url ?? '';
     }
   }
 }
