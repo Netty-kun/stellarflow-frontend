@@ -22,6 +22,7 @@ export interface WalletState {
 
 interface WalletStateContextType {
   wallet: WalletState | null;
+  isConnected: boolean;
 }
 
 interface WalletStatusContextType {
@@ -49,8 +50,44 @@ export const WalletStatusContext = createContext<WalletStatusContextType | null>
 export const WalletActionsContext = createContext<WalletActionsContextType | null>(null);
 
 const CACHE_TTL = 2500;
+const WALLET_STORAGE_KEY = 'stellarflow.wallet.publicKey';
 let cache: { expiresAt: number; value: WalletState | null } | null = null;
 let pendingRequest: Promise<WalletState | null> | null = null;
+
+function readPersistedPublicKey(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    return (
+      window.localStorage.getItem(WALLET_STORAGE_KEY) ||
+      window.sessionStorage.getItem(WALLET_STORAGE_KEY)
+    );
+  } catch {
+    return null;
+  }
+}
+
+function persistPublicKey(publicKey: string): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(WALLET_STORAGE_KEY, publicKey);
+    window.sessionStorage.removeItem(WALLET_STORAGE_KEY);
+  } catch {
+    // Storage can be unavailable in private browsing or sandboxed frames.
+  }
+}
+
+function clearPersistedPublicKey(): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(WALLET_STORAGE_KEY);
+    window.sessionStorage.removeItem(WALLET_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures while handling an expired wallet session.
+  }
+}
 
 const createFallbackState = (source: WalletState['source']): WalletState => ({
   publicKey: null,
@@ -119,6 +156,11 @@ async function getWalletState(): Promise<WalletState | null> {
       expiresAt: Date.now() + CACHE_TTL,
       value: state,
     };
+    if (state.connected && state.publicKey) {
+      persistPublicKey(state.publicKey);
+    } else {
+      clearPersistedPublicKey();
+    }
     pendingRequest = null;
     return state;
   });
@@ -131,6 +173,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const persistedPublicKey = readPersistedPublicKey();
+    if (persistedPublicKey) {
+      setWallet({
+        publicKey: persistedPublicKey,
+        connected: true,
+        source: 'extension',
+        lastCheckedAt: Date.now(),
+      });
+    }
+  }, [mounted]);
 
   const refreshWalletState = React.useCallback(async () => {
     if (!mounted) return null;
@@ -152,11 +208,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return;
-    refreshWalletState();
+    void refreshWalletState();
   }, [mounted, refreshWalletState]);
 
   const stateValue = useMemo<WalletStateContextType>(
-    () => ({ wallet }),
+    () => ({ wallet, isConnected: Boolean(wallet?.connected) }),
     [wallet],
   );
 
@@ -172,7 +228,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Serve static placeholder during SSR to prevent hydration mismatch
   if (!mounted) {
-    const placeholderState: WalletStateContextType = { wallet: null };
+    const placeholderState: WalletStateContextType = { wallet: null, isConnected: false };
     const placeholderStatus: WalletStatusContextType = { isChecking: false, error: null };
     const placeholderActions: WalletActionsContextType = { refreshWalletState: () => Promise.resolve(null) };
 
