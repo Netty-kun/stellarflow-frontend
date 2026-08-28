@@ -27,3 +27,7 @@ export {
   default as RateLockCountdown,
   type RateLockCountdownProps,
 } from "./RateLockCountdown";
+export {
+  default as FeeSavingsWidget,
+  type FeeSavingsWidgetProps,
+} from "./FeeSavingsWidget";
