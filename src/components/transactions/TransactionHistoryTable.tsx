@@ -6,6 +6,7 @@ import { ICON_IDS } from "@/components/icons/iconIds";
 import { useToast } from "@/components/ui/ToastQueue";
 import { exportTransactionsToCsv, type TaxPlatform } from "@/utils/csvExport";
 import { useTransactionHistoryWithFallback } from "@/app/hooks/useTransactionHistory";
+import TransactionHistoryTableSkeleton from "@/components/skeletons/TransactionHistoryTableSkeleton";
 import type { TransactionRecord, TransactionType } from "@/types/transactions";
 
 const TYPE_FILTERS: { label: string; value: "all" | TransactionType }[] = [
@@ -82,6 +83,10 @@ export default function TransactionHistoryTable() {
     }
   };
 
+  if (isLoading) {
+    return <TransactionHistoryTableSkeleton />;
+  }
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-800 bg-[#161b22] text-gray-100">
       <div className="flex flex-col gap-4 border-b border-gray-800 p-4 md:flex-row md:items-center md:justify-between">
@@ -122,67 +127,66 @@ export default function TransactionHistoryTable() {
           </select>
 
           <button
-            type="button"
             onClick={handleExport}
             disabled={isExporting || filteredTransactions.length === 0}
-            className="flex items-center gap-2 rounded-lg border border-gray-700 bg-[#161b22] px-4 py-2 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
           >
-            <Icon id={ICON_IDS.download} size={16} />
-            {isExporting ? "Exporting…" : "Export CSV"}
+            <Icon id={ICON_IDS.DOWNLOAD} className="h-4 w-4" />
+            Export CSV
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-[110px_100px_1fr_1fr_90px_1fr] border-b border-gray-800 bg-[#0d1117] text-[10px] uppercase tracking-wider text-gray-500">
-        <div className="px-6 py-3 font-medium">Date</div>
-        <div className="px-6 py-3 font-medium">Type</div>
-        <div className="px-6 py-3 font-medium">Sent</div>
-        <div className="px-6 py-3 font-medium">Received</div>
-        <div className="px-6 py-3 font-medium">Fee</div>
-        <div className="px-6 py-3 text-right font-medium">TxHash</div>
-      </div>
-
-      {isLoading ? (
-        <div className="px-6 py-16 text-center text-sm text-gray-500">
-          Loading transaction history…
-        </div>
-      ) : filteredTransactions.length === 0 ? (
-        <div className="px-6 py-16 text-center text-sm text-gray-500">
-          No transactions match this filter.
-        </div>
-      ) : (
-        filteredTransactions.map((tx) => (
-          <div
-            key={tx.id}
-            className="grid grid-cols-[110px_100px_1fr_1fr_90px_1fr] items-center border-b border-gray-800/50 font-mono text-[13px]"
-          >
-            <div className="px-6 py-4 text-gray-400">{formatDate(tx.date)}</div>
-            <div className="px-6 py-4 capitalize text-gray-200">{tx.type}</div>
-            <div className="px-6 py-4 text-gray-200">
-              {tx.sentAmount.toLocaleString()} {tx.sentCurrency}
-            </div>
-            <div className="px-6 py-4 text-gray-200">
-              {tx.receivedAmount.toLocaleString()} {tx.receivedCurrency}
-            </div>
-            <div className="px-6 py-4 text-gray-400">
-              {tx.fee} {tx.feeCurrency}
-            </div>
-            <div className="flex items-center justify-end gap-2 px-6 py-4">
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${STATUS_STYLES[tx.status]}`}
-              >
-                {tx.status}
-              </span>
-              <span className="text-blue-500">{truncateHash(tx.txHash)}</span>
-            </div>
-          </div>
-        ))
-      )}
-
-      <div className="flex items-center justify-between border-t border-gray-800 p-4 text-sm text-gray-500">
-        <span>
-          Showing {filteredTransactions.length} of {transactions.length} transactions
-        </span>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm text-gray-300">
+          <thead className="bg-[#0d1117] text-xs uppercase text-gray-500 border-b border-gray-800">
+            <tr>
+              <th scope="col" className="px-6 py-3 font-medium">Type</th>
+              <th scope="col" className="px-6 py-3 font-medium">Date</th>
+              <th scope="col" className="px-6 py-3 font-medium">Amount Sent</th>
+              <th scope="col" className="px-6 py-3 font-medium">Amount Received</th>
+              <th scope="col" className="px-6 py-3 font-medium">Fee</th>
+              <th scope="col" className="px-6 py-3 font-medium">Tx Hash</th>
+              <th scope="col" className="px-6 py-3 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-800">
+            {filteredTransactions.map((tx) => (
+              <tr key={tx.id} className="hover:bg-gray-800/30 transition-colors">
+                <td className="px-6 py-4 capitalize font-medium text-gray-200">
+                  {tx.type}
+                </td>
+                <td className="px-6 py-4 text-gray-400">
+                  {formatDate(tx.date)}
+                </td>
+                <td className="px-6 py-4">
+                  {tx.sentAmount} {tx.sentCurrency}
+                </td>
+                <td className="px-6 py-4">
+                  {tx.receivedAmount} {tx.receivedCurrency}
+                </td>
+                <td className="px-6 py-4 text-gray-400">
+                  {tx.fee} {tx.feeCurrency}
+                </td>
+                <td className="px-6 py-4 font-mono text-xs text-gray-400">
+                  {truncateHash(tx.txHash)}
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[tx.status]}`}>
+                    {tx.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {filteredTransactions.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  No transactions found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
