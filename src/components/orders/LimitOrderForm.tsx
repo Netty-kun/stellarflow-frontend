@@ -8,8 +8,10 @@ import React, {
   useState,
 } from "react";
 import { useWallet } from "@/app/components/providers/WalletProvider";
+import { useOrderBook } from "@/app/hooks/useOrderBook";
 import { useSocket } from "@/app/hooks/useSocket";
 import Icon from "@/components/icons/Icon";
+import type { OrderBookLevel } from "@/types";
 import { ICON_IDS } from "@/components/icons/iconIds";
 import { ASSET_SYMBOLS } from "@/config/assetSymbols";
 import {
@@ -109,6 +111,34 @@ function formatExpiry(timestamp: number): string {
   return `${days}d`;
 }
 
+function aggregateOrderBookLevels(
+  levels: OrderBookLevel[] = [],
+  side: "bid" | "ask",
+): OrderBookLevel[] {
+  const buckets = new Map<number, number>();
+
+  for (const level of levels) {
+    const roundedPrice = Number(level.price.toFixed(6));
+    buckets.set(roundedPrice, (buckets.get(roundedPrice) ?? 0) + level.amount);
+  }
+
+  const sorted = [...buckets.entries()]
+    .map(([price, amount]) => ({ price, amount }))
+    .sort((a, b) =>
+      side === "bid" ? b.price - a.price : a.price - b.price,
+    );
+
+  let cumulative = 0;
+  return sorted.map((level) => {
+    cumulative += level.amount;
+    return {
+      price: level.price,
+      amount: Number(level.amount.toFixed(6)),
+      total: Number(cumulative.toFixed(6)),
+    };
+  });
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export interface LimitOrderFormProps {
@@ -162,6 +192,49 @@ export function LimitOrderForm({
   const spotPrice: number | null = useMemo(
     () => (lastUpdate ? lastUpdate.price : null),
     [lastUpdate],
+  );
+
+  const { orderBook } = useOrderBook({
+    assetId: selectedPair.assetSymbol,
+    depth: 8,
+  });
+
+  const aggregatedBids = useMemo(
+    () => aggregateOrderBookLevels(orderBook?.bids ?? [], "bid"),
+    [orderBook?.bids],
+  );
+
+  const aggregatedAsks = useMemo(
+    () => aggregateOrderBookLevels(orderBook?.asks ?? [], "ask"),
+    [orderBook?.asks],
+  );
+
+  const maxDepthTotal = useMemo(
+    () =>
+      Math.max(
+        ...aggregatedBids.map((level) => level.total),
+        ...aggregatedAsks.map((level) => level.total),
+        1,
+      ),
+    [aggregatedBids, aggregatedAsks],
+  );
+
+  const handleBookSelection = useCallback(
+    (level: OrderBookLevel, side: "bid" | "ask") => {
+      setRawPrice(formatPrice(level.price, decimals));
+      setRawAmount(level.amount.toFixed(6));
+      setSubmitError(null);
+      setSubmitSuccess(null);
+      setTouchedPrice(true);
+      setTouchedAmount(true);
+
+      if (side === "bid") {
+        setSubmitSuccess(`Bid level ${level.price.toFixed(decimals)} prefilled.`);
+      } else {
+        setSubmitSuccess(`Ask level ${level.price.toFixed(decimals)} prefilled.`);
+      }
+    },
+    [decimals],
   );
 
   // ── Form state ────────────────────────────────────────────────────────────
@@ -401,6 +474,86 @@ export function LimitOrderForm({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* ── Live level-2 order book feed ─────────────────────────── */}
+          <div className="space-y-2 rounded-xl border border-gray-800 bg-[#0d1117]/80 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs uppercase font-bold tracking-wider text-gray-500">
+                Live Depth Feed
+              </p>
+              <span className="text-[10px] font-mono text-gray-500">
+                {orderBook ? new Date(orderBook.timestamp).toLocaleTimeString() : "Waiting..."}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-gray-800 bg-[#0b1220] p-2">
+                <div className="mb-1.5 grid grid-cols-2 text-[9px] font-bold uppercase tracking-widest text-gray-500">
+                  <span>Bids</span>
+                  <span className="text-right">Size</span>
+                </div>
+                <div className="space-y-1">
+                  {aggregatedBids.length > 0 ? (
+                    aggregatedBids.map((level) => (
+                      <button
+                        key={`${selectedPair.pairId}-bid-${level.price}-${orderBook?.timestamp ?? "idle"}`}
+                        type="button"
+                        onClick={() => handleBookSelection(level, "bid")}
+                        className="group relative grid w-full grid-cols-2 overflow-hidden rounded-md border border-emerald-500/10 bg-emerald-500/0 px-1.5 py-1 text-left font-mono text-xs text-emerald-400 transition hover:border-emerald-500/30 hover:bg-emerald-500/10 focus-visible:outline-2 focus-visible:outline-emerald-400 animate-pulse"
+                      >
+                        <span
+                          className="absolute inset-y-0 left-0 bg-emerald-500/10"
+                          style={{
+                            width: `${Math.min(100, (level.total / maxDepthTotal) * 100)}%`,
+                          }}
+                          aria-hidden="true"
+                        />
+                        <span className="relative">{formatPrice(level.price, decimals)}</span>
+                        <span className="relative text-right text-gray-300">
+                          {level.amount.toFixed(4)}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-gray-600">No bid liquidity</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-800 bg-[#0b1220] p-2">
+                <div className="mb-1.5 grid grid-cols-2 text-[9px] font-bold uppercase tracking-widest text-gray-500">
+                  <span>Asks</span>
+                  <span className="text-right">Size</span>
+                </div>
+                <div className="space-y-1">
+                  {aggregatedAsks.length > 0 ? (
+                    aggregatedAsks.map((level) => (
+                      <button
+                        key={`${selectedPair.pairId}-ask-${level.price}-${orderBook?.timestamp ?? "idle"}`}
+                        type="button"
+                        onClick={() => handleBookSelection(level, "ask")}
+                        className="group relative grid w-full grid-cols-2 overflow-hidden rounded-md border border-red-500/10 bg-red-500/0 px-1.5 py-1 text-left font-mono text-xs text-red-400 transition hover:border-red-500/30 hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-red-400 animate-pulse"
+                      >
+                        <span
+                          className="absolute inset-y-0 left-0 bg-red-500/10"
+                          style={{
+                            width: `${Math.min(100, (level.total / maxDepthTotal) * 100)}%`,
+                          }}
+                          aria-hidden="true"
+                        />
+                        <span className="relative">{formatPrice(level.price, decimals)}</span>
+                        <span className="relative text-right text-gray-300">
+                          {level.amount.toFixed(4)}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-gray-600">No ask liquidity</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ── Target price input ─────────────────────────────────────── */}
