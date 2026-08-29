@@ -6,8 +6,8 @@ import { ICON_IDS } from "@/components/icons/iconIds";
 import { useToast } from "@/components/ui/ToastQueue";
 import { exportTransactionsToCsv, type TaxPlatform } from "@/utils/csvExport";
 import { useTransactionHistoryWithFallback } from "@/app/hooks/useTransactionHistory";
-import TransactionHistoryTableSkeleton from "@/components/skeletons/TransactionHistoryTableSkeleton";
 import type { TransactionRecord, TransactionType } from "@/types/transactions";
+import { TransactionHistoryTableSkeleton } from "@/components/skeletons/TransactionHistoryTableSkeleton";
 
 const TYPE_FILTERS: { label: string; value: "all" | TransactionType }[] = [
   { label: "All Activity", value: "all" },
@@ -127,67 +127,63 @@ export default function TransactionHistoryTable() {
           </select>
 
           <button
+            type="button"
             onClick={handleExport}
             disabled={isExporting || filteredTransactions.length === 0}
-            className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg border border-gray-700 bg-[#161b22] px-4 py-2 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Icon id={ICON_IDS.DOWNLOAD} className="h-4 w-4" />
-            Export CSV
+            <Icon id={ICON_IDS.download} size={16} />
+            {isExporting ? "Exporting…" : "Export CSV"}
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-gray-300">
-          <thead className="bg-[#0d1117] text-xs uppercase text-gray-500 border-b border-gray-800">
-            <tr>
-              <th scope="col" className="px-6 py-3 font-medium">Type</th>
-              <th scope="col" className="px-6 py-3 font-medium">Date</th>
-              <th scope="col" className="px-6 py-3 font-medium">Amount Sent</th>
-              <th scope="col" className="px-6 py-3 font-medium">Amount Received</th>
-              <th scope="col" className="px-6 py-3 font-medium">Fee</th>
-              <th scope="col" className="px-6 py-3 font-medium">Tx Hash</th>
-              <th scope="col" className="px-6 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {filteredTransactions.map((tx) => (
-              <tr key={tx.id} className="hover:bg-gray-800/30 transition-colors">
-                <td className="px-6 py-4 capitalize font-medium text-gray-200">
-                  {tx.type}
-                </td>
-                <td className="px-6 py-4 text-gray-400">
-                  {formatDate(tx.date)}
-                </td>
-                <td className="px-6 py-4">
-                  {tx.sentAmount} {tx.sentCurrency}
-                </td>
-                <td className="px-6 py-4">
-                  {tx.receivedAmount} {tx.receivedCurrency}
-                </td>
-                <td className="px-6 py-4 text-gray-400">
-                  {tx.fee} {tx.feeCurrency}
-                </td>
-                <td className="px-6 py-4 font-mono text-xs text-gray-400">
-                  {truncateHash(tx.txHash)}
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[tx.status]}`}>
-                    {tx.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {filteredTransactions.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                  No transactions found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="grid grid-cols-[110px_100px_1fr_1fr_90px_1fr] border-b border-gray-800 bg-[#0d1117] text-[10px] uppercase tracking-wider text-gray-500">
+        <div className="px-6 py-3 font-medium">Date</div>
+        <div className="px-6 py-3 font-medium">Type</div>
+        <div className="px-6 py-3 font-medium">Sent</div>
+        <div className="px-6 py-3 font-medium">Received</div>
+        <div className="px-6 py-3 font-medium">Fee</div>
+        <div className="px-6 py-3 text-right font-medium">TxHash</div>
       </div>
+
+      {filteredTransactions.length === 0 ? (
+        <div className="px-6 py-16 text-center text-sm text-gray-500">
+          No transactions match this filter.
+        </div>
+      ) : (
+        filteredTransactions.map((tx) => (
+          <div
+            key={tx.id}
+            className="grid grid-cols-[110px_100px_1fr_1fr_90px_1fr] items-center border-b border-gray-800/50 font-mono text-[13px]"
+          >
+            <div className="px-6 py-4 text-gray-400">{formatDate(tx.date)}</div>
+            <div className="px-6 py-4 capitalize text-gray-200">{tx.type}</div>
+            <div className="px-6 py-4 text-gray-300">
+              {tx.sentAmount} {tx.sentCurrency}
+            </div>
+            <div className="px-6 py-4 text-gray-300">
+              {tx.receivedAmount} {tx.receivedCurrency}
+            </div>
+            <div className="px-6 py-4 text-gray-400">
+              {tx.fee} {tx.feeCurrency}
+            </div>
+            <div className="px-6 py-4 text-right">
+              <a
+                href={`https://stellar.expert/explorer/public/tx/${tx.txHash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-blue-400 hover:underline"
+              >
+                {truncateHash(tx.txHash)}
+                <span className={`ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-sans font-medium uppercase ${STATUS_STYLES[tx.status]}`}>
+                  {tx.status}
+                </span>
+              </a>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
