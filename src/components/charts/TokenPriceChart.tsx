@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries } from 'lightweight-charts';
 
 export type Timeframe = '1H' | '24H' | '7D' | '1M';
 
@@ -28,7 +28,7 @@ export const TokenPriceChart: React.FC<TokenPriceChartProps> = ({
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const seriesRef = useRef<ISeriesApi<any> | null>(null);
 
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>('24H');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -75,7 +75,7 @@ export const TokenPriceChart: React.FC<TokenPriceChartProps> = ({
       },
     });
 
-    const candlestickSeries = chart.addCandlestickSeries({
+const candlestickSeries = chart.addSeries({ type: 'Candlestick' } as any, {
       upColor: '#10B981',
       downColor: '#EF4444',
       borderVisible: false,

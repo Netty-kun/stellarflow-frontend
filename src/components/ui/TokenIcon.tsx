@@ -54,6 +54,7 @@ export function TokenIcon({
         width={size}
         height={size}
         quality={90}
+        loading="lazy"
         onError={() => setHasError(true)}
         className="h-full w-full object-cover transition-opacity duration-200"
       />

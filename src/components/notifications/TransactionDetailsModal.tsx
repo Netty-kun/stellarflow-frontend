@@ -19,6 +19,8 @@ const TYPE_LABELS: Record<PushEventType, string> = {
   limit_order: "Limit order filled",
   remittance: "Remittance payout completed",
   governance: "Governance vote confirmed",
+  deposit: "Deposit confirmed",
+  liquidation_warning: "Liquidation warning",
 };
 
 export function TransactionDetailsModal({

@@ -14,6 +14,7 @@ export interface ReceiptData {
   timestamp: string;
   senderName?: string;
   recipientName?: string;
+  recipientAddress?: string;
 }
 
 interface ReceiptModalProps {
@@ -34,6 +35,24 @@ interface ReceiptModalProps {
  */
 export function ReceiptModal({ isOpen, onClose, receiptData }: ReceiptModalProps) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [contacts, setContacts] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("stellarflow-contacts");
+      if (saved) {
+        try {
+          setContacts(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse contacts", e);
+        }
+      }
+    }
+  }, [isOpen]);
+
+  const alias = receiptData.recipientAddress
+    ? contacts.find(c => c.address === receiptData.recipientAddress)?.alias
+    : null;
 
   if (!isOpen) return null;
 
@@ -94,6 +113,20 @@ export function ReceiptModal({ isOpen, onClose, receiptData }: ReceiptModalProps
               <span className="text-gray-500">Reference:</span>
               <span className="font-medium text-gray-900 dark:text-white">
                 {receiptData.anchorReference}
+              </span>
+              <span className="text-gray-500">Recipient Name:</span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                {receiptData.recipientName || "—"}
+              </span>
+              <span className="text-gray-500">Recipient Address:</span>
+              <span className="font-medium text-gray-900 dark:text-white flex items-center gap-1.5">
+                {alias ? (
+                  <span className="inline-flex items-center bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-blue-500/20">
+                    {alias}
+                  </span>
+                ) : (
+                  receiptData.recipientAddress ? `${receiptData.recipientAddress.slice(0, 6)}...${receiptData.recipientAddress.slice(-6)}` : "—"
+                )}
               </span>
               <span className="text-gray-500">Amount Sent:</span>
               <span className="font-medium text-gray-900 dark:text-white">

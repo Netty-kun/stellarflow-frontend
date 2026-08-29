@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import OptimizedDialog from "@/app/components/OptimizedDialog";
 import Icon from "@/components/icons/Icon";
-import { ICON_IDS } from "@/components/icons/iconIds";
+import { ICON_IDS, type IconId } from "@/components/icons/iconIds";
 import {
   WalletProvider,
   useWallet,

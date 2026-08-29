@@ -12,13 +12,17 @@ export type PushAlertCategory =
   | "swaps"
   | "limitOrders"
   | "governanceVotes"
-  | "remittancePayouts";
+  | "remittancePayouts"
+  | "deposits"
+  | "liquidationWarnings";
 
 export type PushEventType =
   | "swap"
   | "limit_order"
   | "remittance"
-  | "governance";
+  | "governance"
+  | "deposit"
+  | "liquidation_warning";
 
 export interface NotificationPreferences {
   /** Master switch — must be true for any push to be delivered. */
@@ -27,6 +31,8 @@ export interface NotificationPreferences {
   limitOrders: boolean;
   governanceVotes: boolean;
   remittancePayouts: boolean;
+  deposits: boolean;
+  liquidationWarnings: boolean;
 }
 
 export interface PushSubscriptionJSON {
@@ -53,6 +59,8 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   limitOrders: true,
   governanceVotes: false,
   remittancePayouts: true,
+  deposits: true,
+  liquidationWarnings: true,
 };
 
 const PREFS_STORAGE_KEY = "sf.push.preferences.v1";
@@ -64,6 +72,8 @@ export const CATEGORY_TO_EVENT: Record<PushAlertCategory, PushEventType> = {
   limitOrders: "limit_order",
   governanceVotes: "governance",
   remittancePayouts: "remittance",
+  deposits: "deposit",
+  liquidationWarnings: "liquidation_warning",
 };
 
 export const EVENT_TO_CATEGORY: Record<PushEventType, PushAlertCategory> = {
@@ -71,6 +81,8 @@ export const EVENT_TO_CATEGORY: Record<PushEventType, PushAlertCategory> = {
   limit_order: "limitOrders",
   governance: "governanceVotes",
   remittance: "remittancePayouts",
+  deposit: "deposits",
+  liquidation_warning: "liquidationWarnings",
 };
 
 export function isPushSupported(): boolean {
@@ -115,6 +127,8 @@ export function normalizePreferences(
     limitOrders: input?.limitOrders ?? true,
     governanceVotes: input?.governanceVotes ?? false,
     remittancePayouts: input?.remittancePayouts ?? true,
+    deposits: input?.deposits ?? true,
+    liquidationWarnings: input?.liquidationWarnings ?? true,
   };
 }
 
@@ -149,6 +163,7 @@ export function parseNotificationDeepLink(
   const type = params.get("type") as PushEventType | null;
   if (!txHash || !type) return null;
   if (!["swap", "limit_order", "remittance", "governance"].includes(type)) return null;
+    if (!["swap", "limit_order", "remittance", "governance", "deposit", "liquidation_warning"].includes(type)) return null;
   return { txHash, type };
 }
 
@@ -196,6 +211,16 @@ async function postSubscription(
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Push ${path} failed (${res.status}): ${text || res.statusText}`);
+  }
+}
+
+function resolveWalletAddress(walletAddress?: string | null): string | null {
+  if (walletAddress) return walletAddress;
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem("stellarflow.wallet.publicKey");
+  } catch {
+    return null;
   }
 }
 
@@ -272,7 +297,7 @@ export async function subscribeToPush(
   await postSubscription("subscribe", {
     subscription: json,
     preferences: normalized,
-    walletAddress: walletAddress ?? null,
+    walletAddress: resolveWalletAddress(walletAddress),
   });
 
   if (typeof window !== "undefined") {
@@ -306,7 +331,7 @@ export async function unsubscribeFromPush(
   if (endpoint) {
     await postSubscription("unsubscribe", {
       endpoint,
-      walletAddress: walletAddress ?? null,
+      walletAddress: resolveWalletAddress(walletAddress),
     }).catch(() => undefined);
   }
 
@@ -332,7 +357,7 @@ export async function updatePushPreferences(
     await postSubscription("subscribe", {
       subscription: sub,
       preferences: normalized,
-      walletAddress: walletAddress ?? null,
+      walletAddress: resolveWalletAddress(walletAddress),
     });
   } else if (!normalized.enabled && sub) {
     await unsubscribeFromPush(walletAddress);
@@ -362,4 +387,32 @@ export const PREFERENCE_LABELS: Record<
     title: "Remittance Payouts",
     description: "Alert when a remittance payout completes.",
   },
+  deposits: {
+    title: "Deposit Confirmations",
+    description: "Alert when an account deposit is confirmed.",
+  },
+  liquidationWarnings: {
+    title: "Liquidation Warnings",
+    description: "Alert before a position reaches liquidation.",
+  },
 };
+
+/** Display a local notification to verify the configured alert channel. */
+export async function triggerTestNotification(
+  type: "deposit" | "liquidation_warning",
+): Promise<void> {
+  if (!isPushSupported() || Notification.permission !== "granted") {
+    throw new Error("Enable browser notifications before sending a test alert");
+  }
+  const registration = await navigator.serviceWorker.ready;
+  const payload = type === "deposit"
+    ? { title: "Deposit confirmed", body: "Your test deposit notification was delivered." }
+    : { title: "Liquidation warning", body: "Your test liquidation warning was delivered." };
+  await registration.showNotification(payload.title, {
+    body: payload.body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: `sf-test-${type}`,
+    data: { type, txHash: "test-notification" },
+  });
+}

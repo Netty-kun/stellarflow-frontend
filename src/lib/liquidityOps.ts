@@ -24,7 +24,7 @@ export interface SingleSidedLiquidityResult {
 
 async function waitForTransaction(
   server: InstanceType<
-    Awaited<typeof import("@stellar/stellar-sdk")["SorobanRpc"]["Server"]>
+    Awaited<typeof import("@stellar/stellar-sdk/rpc")>["Server"]
   >,
   hash: string,
 ): Promise<void> {
@@ -56,9 +56,9 @@ export async function submitSingleSidedLiquidity(
     Address,
     Contract,
     Networks,
-    SorobanRpc,
     TransactionBuilder,
   } = await import("@stellar/stellar-sdk");
+  const { Server } = await import("@stellar/stellar-sdk/rpc");
 
   if (!(await isConnected())) {
     throw new Error("Freighter wallet is not connected. Please connect your wallet first.");
@@ -66,7 +66,7 @@ export async function submitSingleSidedLiquidity(
   const { address: publicKey } = await getAddress();
   if (!publicKey) throw new Error("Could not retrieve public key from Freighter.");
 
-  const server = new SorobanRpc.Server(SOROBAN_RPC_URL, { allowHttp: true });
+  const server = new Server(SOROBAN_RPC_URL, { allowHttp: true });
   const { nativeToScVal } = await import("@stellar/stellar-sdk");
   const transaction = new TransactionBuilder(await server.getAccount(publicKey), {
     fee: DEFAULT_FEE,

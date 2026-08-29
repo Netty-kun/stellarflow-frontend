@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { TokenIcon } from '@/components/ui/TokenIcon';
 import type { TokenOption } from './SwapForm';
 
 export interface PathHop {
@@ -145,18 +146,14 @@ interface TokenBadgeProps {
 
 const TokenBadge: React.FC<TokenBadgeProps> = ({ symbol, iconUrl, isDestination }) => (
   <div className="flex flex-col items-center gap-1 shrink-0">
-    <div
-      className={`flex items-center justify-center w-8 h-8 rounded-full border overflow-hidden ${
+    <TokenIcon
+      src={iconUrl}
+      symbol={symbol}
+      size={32}
+      className={`border ${
         isDestination ? 'border-blue-500 bg-blue-600/10' : 'border-gray-700 bg-gray-800'
       }`}
-    >
-      {iconUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={iconUrl} alt={symbol} className="w-full h-full object-cover" />
-      ) : (
-        <span className="text-[10px] font-bold text-gray-300">{symbol.slice(0, 3)}</span>
-      )}
-    </div>
+    />
     <span className="text-[10px] font-semibold text-gray-300 whitespace-nowrap">{symbol}</span>
   </div>
 );
@@ -170,10 +167,12 @@ const HopConnector: React.FC<HopConnectorProps> = ({ hop }) => (
     <div className="flex items-center gap-1 text-gray-600">
       <ArrowRight size={14} />
       {hop.poolIcon ? (
-        <div className="flex items-center justify-center w-4 h-4 rounded-full overflow-hidden border border-gray-700 bg-gray-800 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={hop.poolIcon} alt={hop.poolLabel || hop.poolId} className="w-full h-full object-cover" />
-        </div>
+        <TokenIcon
+          src={hop.poolIcon}
+          symbol={hop.poolLabel || hop.poolId}
+          size={16}
+          className="border border-gray-700 bg-gray-800"
+        />
       ) : null}
     </div>
     <span

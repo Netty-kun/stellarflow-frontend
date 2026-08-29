@@ -58,11 +58,12 @@ export async function claimEscrow({
     throw new Error('Could not retrieve public key from Freighter.');
   }
 
-  const rpcServer = new rpc.Server(SOROBAN_RPC_URL, { allowHttp: true });
   const contract = new Contract(contractId);
   const preimageBytes = Buffer.from(preimageHex, 'hex');
 
-  const sourceAccount = await rpcManager.execute((server) => server.getAccount(publicKey));
+  const sourceAccount = await rpcManager.execute((server) => server.getAccount(publicKey)) as Awaited<
+    ReturnType<InstanceType<Awaited<typeof import('@stellar/stellar-sdk')>['rpc']['Server']>['getAccount']>
+  >;
 
   const builtTx = new TransactionBuilder(sourceAccount, {
     fee: DEFAULT_FEE,
@@ -74,7 +75,9 @@ export async function claimEscrow({
     .setTimeout(180)
     .build();
 
-  const preparedTx = await rpcManager.execute((server) => server.prepareTransaction(builtTx));
+  const preparedTx = await rpcManager.execute((server) => server.prepareTransaction(builtTx)) as Awaited<
+    ReturnType<InstanceType<Awaited<typeof import('@stellar/stellar-sdk')>['rpc']['Server']>['prepareTransaction']>
+  >;
 
   const { signedTxXdr, error } = await signTransaction(preparedTx.toXDR(), {
     networkPassphrase: Networks.TESTNET,
@@ -89,7 +92,9 @@ export async function claimEscrow({
     Networks.TESTNET,
   );
 
-  const submitResponse = await rpcManager.execute((server) => server.sendTransaction(signedTx));
+  const submitResponse = await rpcManager.execute((server) => server.sendTransaction(signedTx)) as Awaited<
+    ReturnType<InstanceType<Awaited<typeof import('@stellar/stellar-sdk')>['rpc']['Server']>['sendTransaction']>
+  >;
 
   if (submitResponse.status === 'ERROR') {
     throw new Error(

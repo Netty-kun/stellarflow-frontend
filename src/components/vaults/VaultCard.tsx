@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { createChart, IChartApi, ISeriesApi, Time, AreaData } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, Time, AreaData, AreaSeries } from 'lightweight-charts';
 import OptimizedDialog from '@/app/components/OptimizedDialog';
 import { useWallet } from '@/app/components/providers/WalletProvider';
 
@@ -119,7 +119,7 @@ function VaultApyChart({ apyHistory }: { apyHistory: VaultApyHistory[] }) {
       },
     });
 
-    const areaSeries = chart.addAreaSeries({
+    const areaSeries = chart.addSeries(AreaSeries, {
       topColor: '#10B98140',
       bottomColor: '#10B98100',
       lineColor: '#10B981',
@@ -204,7 +204,7 @@ function VaultActionModal({
   };
 
   const availableBalance = mode === 'deposit' 
-    ? parseFloat(wallet?.balances?.[vault.asset.contractId] || '0')
+    ? 0
     : parseFloat(vault.stats.userSfvTokenBalance);
 
   const handleSetMax = () => {

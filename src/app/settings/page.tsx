@@ -8,7 +8,14 @@ import { useRafThrottle } from '../hooks/useRafThrottle';
 import { openPushPreferencesModal } from '@/components/notifications';
 import { loadPreferences } from '@/services/notifications';
 import { useTransactionAudio } from '@/hooks/useTransactionAudio';
+import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { useScreenLock, ScreenLockModal } from '@/components/security/ScreenLockModal';
+import { useTransactionHistoryWithFallback } from '@/app/hooks/useTransactionHistory';
+import { exportTransactionsToCsv, type TaxPlatform } from '@/utils/csvExport';
+import { useToast } from '@/components/ui/ToastQueue';
+import { useDashboardCustomizer } from '@/components/dashboard/useDashboardCustomizer';
+import { WalletNonceResync } from '@/components/wallet/WalletNonceResync';
+import { useZKProofLoader } from '@/components/zk/useZKProofLoader';
 
 interface Settings {
   emailReports: boolean;
@@ -32,8 +39,27 @@ const TOGGLE_STYLES = {
 export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false);
   const [screenLockModalOpen, setScreenLockModalOpen] = useState(false);
-  const { isEnabled: soundEffectsEnabled, toggle: toggleSoundEffects } = useTransactionAudio();
+  const {
+    isEnabled: soundEffectsEnabled,
+    toggle: toggleSoundEffects,
+    currentPack,
+    setSoundPack,
+    playPreview,
+  } = useTransactionAudio();
+  const {
+    isEnabled: hapticsEnabled,
+    toggle: toggleHaptics,
+    triggerTap: testHapticTap,
+    triggerTxConfirm: testHapticTx,
+    isSupported: hapticsSupported,
+  } = useHapticFeedback();
   const { isPinSet, isLocked, idleTimeoutMinutes, lockNow } = useScreenLock();
+  const { data: transactions } = useTransactionHistoryWithFallback();
+  const { addToast, updateToast } = useToast();
+  const [exportPlatform, setExportPlatform] = useState<TaxPlatform>("standard");
+  const [isExporting, setIsExporting] = useState(false);
+  const { openCustomizer, Customizer } = useDashboardCustomizer();
+  const { Loader: ZKProofLoader, startProofGeneration } = useZKProofLoader();
   const [settings, setSettings] = useState<Settings>({
     emailReports: true,
     pushNotifications: false,
@@ -46,8 +72,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const prefs = loadPreferences();
-    setSettings((prev) => ({ ...prev, pushNotifications: prefs.enabled }));
-    setSavedSettings((prev) => ({ ...prev, pushNotifications: prefs.enabled }));
+    setTimeout(() => {
+      setSettings((prev) => ({ ...prev, pushNotifications: prefs.enabled }));
+      setSavedSettings((prev) => ({ ...prev, pushNotifications: prefs.enabled }));
+    }, 0);
   }, []);
 
   const debouncedSettings = useDebounce(settings, 500);
@@ -80,6 +108,41 @@ export default function SettingsPage() {
 
   const multiSigTrackClasses = settings.multiSigApproval ? TOGGLE_STYLES.enabled.track : TOGGLE_STYLES.disabled.track;
   const multiSigKnobClasses = settings.multiSigApproval ? TOGGLE_STYLES.enabled.knob : TOGGLE_STYLES.disabled.knob;
+
+  const EXPORT_PLATFORMS: { label: string; value: TaxPlatform }[] = [
+    { label: "Standard CSV", value: "standard" },
+    { label: "Koinly", value: "koinly" },
+    { label: "CoinTracker", value: "cointracker" },
+  ];
+
+  const handleExport = async () => {
+    if (isExporting || !transactions || transactions.length === 0) return;
+
+    setIsExporting(true);
+    const platformLabel = EXPORT_PLATFORMS.find(p => p.value === exportPlatform)?.label;
+    const toastId = addToast({
+      title: "Preparing CSV export",
+      description: `Formatting ${transactions.length} transactions for ${platformLabel}…`,
+      status: "processing",
+    });
+
+    try {
+      await exportTransactionsToCsv(transactions, { platform: exportPlatform });
+      updateToast(toastId, {
+        title: "Export ready",
+        description: `${transactions.length} transactions downloaded as ${platformLabel} CSV.`,
+        status: "confirmed",
+      });
+    } catch {
+      updateToast(toastId, {
+        title: "Export failed",
+        description: "Could not generate the CSV file. Please try again.",
+        status: "failed",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-100 p-8">
@@ -171,6 +234,93 @@ export default function SettingsPage() {
               enabled={soundEffectsEnabled}
               onToggle={toggleSoundEffects}
             />
+            {soundEffectsEnabled && (
+              <div className="pl-12 pr-3 py-3 border-t border-gray-800 space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-300">Sound Pack Theme</p>
+                  <p className="text-xs text-gray-500">Choose a synthesizer voice for transaction notifications.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(
+                    [
+                      { id: 'minimalist', label: 'Minimalist' },
+                      { id: 'retro', label: 'Retro 8-Bit' },
+                      { id: 'futuristic', label: 'Futuristic Synth' },
+                      { id: 'muted', label: 'Muted' },
+                    ] as const
+                  ).map((pack) => (
+                    <div
+                      key={pack.id}
+                      onClick={() => setSoundPack(pack.id)}
+                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
+                        currentPack === pack.id
+                          ? 'border-blue-500 bg-blue-600/10'
+                          : 'border-gray-800 bg-[#0d1117]/50 hover:border-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="soundPack"
+                          checked={currentPack === pack.id}
+                          onChange={() => setSoundPack(pack.id)}
+                          className="text-blue-500 focus:ring-blue-500 bg-transparent border-gray-700 cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-gray-200">{pack.label}</span>
+                      </div>
+                      {pack.id !== 'muted' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playPreview(pack.id);
+                          }}
+                          className="flex items-center justify-center p-1.5 rounded-md hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+                          title={`Preview ${pack.label}`}
+                        >
+                          <Icon id={ICON_IDS.volume2} size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <ToggleItem
+              icon={<Icon id={ICON_IDS.smartphone} size={18} />}
+              title="Haptic Feedback"
+              description="Deliver tactile vibration cues on button taps, slider adjustments, and transaction confirmations on mobile devices."
+              enabled={hapticsEnabled}
+              onToggle={toggleHaptics}
+            />
+            {hapticsEnabled && (
+              <div className="pl-12 pr-3 py-3 border-t border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-gray-300">Tactile Vibration Preview</p>
+                  <p className="text-xs text-gray-500">
+                    {hapticsSupported
+                      ? 'Vibration API active on this mobile device.'
+                      : 'Web Vibration API active (cues activate on supported mobile devices).'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => testHapticTap(true)}
+                    className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg border border-gray-700 transition-colors font-medium"
+                  >
+                    Tap Pulse (12ms)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => testHapticTx(true)}
+                    className="px-3 py-1.5 text-xs bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg border border-blue-500/30 transition-colors font-medium"
+                  >
+                    Double Pulse
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -249,6 +399,92 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <section className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+            <Icon id={ICON_IDS.download} size={20} className="text-orange-400" />
+            Tax Export
+          </h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Export your transaction history in formats compatible with popular crypto tax platforms.
+          </p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs text-gray-500 uppercase font-bold">Export Format</label>
+              <select
+                value={exportPlatform}
+                onChange={(e) => setExportPlatform(e.target.value as TaxPlatform)}
+                className="w-full md:w-64 bg-[#0d1117] border border-gray-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-blue-500"
+              >
+                {EXPORT_PLATFORMS.map((platform) => (
+                  <option key={platform.value} value={platform.value}>
+                    {platform.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={isExporting || !transactions || transactions.length === 0}
+              className="flex items-center gap-2 rounded-lg border border-gray-700 bg-[#161b22] px-4 py-2 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon id={ICON_IDS.download} size={16} />
+              {isExporting ? "Exporting…" : "Download Tax Report"}
+            </button>
+            <p className="text-xs text-gray-500">
+              {transactions?.length || 0} transactions available for export
+            </p>
+          </div>
+        </section>
+
+        <section className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Icon id={ICON_IDS.layoutDashboard} size={20} className="text-cyan-400" />
+              Dashboard Layout
+            </h2>
+            <button
+              onClick={openCustomizer}
+              className="px-4 py-2 text-sm bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Icon id={ICON_IDS.layoutDashboard} size={16} />
+              Customize Layout
+            </button>
+          </div>
+          <p className="text-sm text-gray-500">
+            Drag and drop to reorder widgets, toggle visibility, or reset to default layout.
+          </p>
+        </section>
+
+        <section className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
+          <h2 className="text-lg font-semibold mb-6 flex items-center gap-2">
+            <Icon id={ICON_IDS.refreshCcw} size={20} className="text-blue-400" />
+            Wallet Nonce Resync
+          </h2>
+          <WalletNonceResync />
+        </section>
+
+        <section className="bg-[#161b22] border border-gray-800 rounded-xl p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Icon id={ICON_IDS.shield} size={20} className="text-purple-400" />
+              ZK Proof Generator (Demo)
+            </h2>
+            <button
+              onClick={() => startProofGeneration()}
+              className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Icon id={ICON_IDS.play} size={16} />
+              Generate Proof
+            </button>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Multi-stage visual loader for client-side Groth16 zero-knowledge proof generation.
+            Stages: Compiling Witness → Computing Proof → Verifying Local Proof → Submitting Payload.
+          </p>
+          <ZKProofLoader />
+        </section>
+
         <div className="flex justify-end gap-4 pt-4">
           <button className="px-6 py-2 border border-gray-700 rounded-lg text-sm relative overflow-hidden" style={{ transition: 'border-color 150ms ease' }}>
             <span className="absolute inset-0 bg-gray-800 opacity-0 hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
@@ -271,6 +507,7 @@ export default function SettingsPage() {
       {screenLockModalOpen && (
         <ScreenLockModal isOpen={screenLockModalOpen} onClose={() => setScreenLockModalOpen(false)} />
       )}
+      <Customizer />
     </div>
   );
 }

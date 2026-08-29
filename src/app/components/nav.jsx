@@ -10,6 +10,10 @@ import { useProgressBar } from "./TopLoadingBar";
 import dynamic from "next/dynamic";
 import MobileMenu from "@/components/navigation/MobileMenu";
 import { AccessibilityToggle } from "@/components/ui/AccessibilityToggle";
+import { PrivacyToggle } from "@/components/privacy";
+import { WalletProvider } from "@/app/components/providers/WalletProvider";
+import { NetworkProvider } from "@/app/components/providers/NetworkProvider";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 // Lazily load the wallet connect button + WalletProvider.
 // WalletProvider pulls in the entire wallet context + @stellar/freighter-api
@@ -41,11 +45,15 @@ const Nav = memo(() => {
   const pathname = usePathname();
 
   return (
-    <main className="sticky top-0 z-50 bg-zinc-950 border-b border-zinc-800">
+    <main className="sticky top-0 z-50 bg-background text-foreground border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-nowrap items-center justify-between gap-3">
         {/* Left Side: Logo + Title */}
         <div className="flex-1 min-w-0 flex items-center gap-3 overflow-hidden">
-          <MobileMenu />
+          <NetworkProvider>
+            <WalletProvider>
+              <MobileMenu />
+            </WalletProvider>
+          </NetworkProvider>
           {/* StellarFlow Logo — optimized WebP with next/image (Issue #46) */}
           <div className="shrink-0" style={{ aspectRatio: "1 / 1", width: 48, height: 48 }}>
             <OptimizedImage
@@ -69,7 +77,9 @@ const Nav = memo(() => {
         <div className="flex flex-wrap items-center gap-2">
           <NetworkStatusIndicator className="hidden sm:inline-block" />
           <WalletConnectButton />
+          <ThemeToggle className="text-foreground/70 hover:bg-control-hover" />
           <AccessibilityToggle />
+          <PrivacyToggle />
 
           <button
             aria-label="System anomaly alerts"

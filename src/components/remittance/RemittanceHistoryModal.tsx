@@ -35,6 +35,7 @@ function toReceiptData(payout: RemittancePayoutRecord): ReceiptData {
     timestamp: payout.date,
     senderName: payout.senderName,
     recipientName: payout.recipientName,
+    recipientAddress: payout.recipientAddress,
   };
 }
 
@@ -59,6 +60,26 @@ export function RemittanceHistoryModal({
     null,
   );
   const [isExporting, setIsExporting] = useState(false);
+  const [contacts, setContacts] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("stellarflow-contacts");
+      if (saved) {
+        try {
+          setContacts(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse contacts", e);
+        }
+      }
+    }
+  }, [isOpen]);
+
+  const getAlias = (address?: string) => {
+    if (!address) return null;
+    const contact = contacts.find(c => c.address === address);
+    return contact ? contact.alias : null;
+  };
 
   if (!isOpen) return null;
 
@@ -144,7 +165,7 @@ export function RemittanceHistoryModal({
                     key={payout.id}
                     className="flex items-center justify-between gap-4 px-4 py-3"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-200">
                           {payout.amountSent.toLocaleString()} {payout.sentCurrency}{" "}
@@ -157,10 +178,27 @@ export function RemittanceHistoryModal({
                           {payout.status}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        {payout.anchorName} · {formatDate(payout.date)} ·{" "}
-                        {payout.recipientName}
-                      </p>
+                      <div className="mt-0.5 text-xs text-gray-500 flex flex-wrap items-center gap-1.5">
+                        <span>{payout.anchorName}</span>
+                        <span>·</span>
+                        <span>{formatDate(payout.date)}</span>
+                        <span>·</span>
+                        <span>{payout.recipientName}</span>
+                        {payout.recipientAddress && (
+                          <>
+                            <span>·</span>
+                            {getAlias(payout.recipientAddress) ? (
+                              <span className="inline-flex items-center bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-blue-500/20">
+                                {getAlias(payout.recipientAddress)}
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[10px] text-gray-600">
+                                ({payout.recipientAddress.slice(0, 6)}...{payout.recipientAddress.slice(-6)})
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     <button

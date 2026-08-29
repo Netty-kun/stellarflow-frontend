@@ -8,6 +8,9 @@ import dynamic from "next/dynamic";
 import Icon from "@/components/icons/Icon";
 import { ICON_IDS } from "@/components/icons/iconIds";
 import type { IconId } from "@/components/icons/iconIds";
+import { useWallet } from "@/app/components/providers/WalletProvider";
+import NetworkSelector from "@/components/navigation/NetworkSelector";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const WalletConnectButton = dynamic(
   () => import("@/app/components/WalletConnectButton"),
@@ -37,6 +40,7 @@ const Path = (props: PathProps) => (
 export default function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
+  const { wallet, isConnected } = useWallet();
 
   const toggleOpen = useCallback(() => {
     setIsOpen((prev) => !prev);
@@ -51,6 +55,17 @@ export default function MobileMenu() {
     const closeTimer = window.setTimeout(() => setIsOpen(false), 0);
     return () => window.clearTimeout(closeTimer);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMenu();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, closeMenu]);
 
   const handleDragEnd = (
     _: MouseEvent | TouchEvent | PointerEvent,
@@ -117,10 +132,37 @@ export default function MobileMenu() {
               dragConstraints={{ left: -280, right: 0 }}
               dragElastic={0.08}
               onDragEnd={handleDragEnd}
-              className="fixed top-0 left-0 bottom-0 w-[280px] bg-zinc-950 border-r border-zinc-800 z-40 flex flex-col p-6 pt-20 justify-between shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mobile navigation"
+              className="fixed top-0 left-0 bottom-0 w-[280px] bg-background text-foreground border-r border-border z-40 flex flex-col p-6 pt-20 justify-between shadow-2xl"
             >
               {/* Top Navigation Items */}
               <div className="space-y-6">
+                <div className="rounded-xl border border-border bg-surface-raised/70 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                    Active account
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className={`h-2 w-2 shrink-0 rounded-full ${isConnected ? "bg-emerald-400" : "bg-zinc-600"}`}
+                    />
+                    <span className="min-w-0 truncate font-mono text-xs text-zinc-200">
+                      {isConnected && wallet?.publicKey
+                        ? `${wallet.publicKey.slice(0, 6)}...${wallet.publicKey.slice(-4)}`
+                        : "No wallet connected"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-border pb-4">
+                  <span className="text-xs font-semibold text-foreground/70">Appearance</span>
+                  <ThemeToggle className="text-foreground/70 hover:bg-control-hover" />
+                </div>
+
+                <NetworkSelector className="w-full" />
+
                 <nav className="flex flex-col gap-2">
                   {navItems.map(({ iconId, label, href }) => {
                     const isActive = pathname === href;

@@ -1,6 +1,5 @@
 import "@/config/env";
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ProgressBarProvider } from "./components/TopLoadingBar";
@@ -12,23 +11,14 @@ import Script from "next/script";
 import SvgSprite from "@/components/icons/SvgSprite";
 import { SecurityBanner } from "@/components/navigation/SecurityBanner";
 import { InstallBanner } from "./components/InstallBanner";
+import { OfflineBanner } from "./components/OfflineBanner";
 import { SwUpdateBanner } from "@/components/pwa/SwUpdateBanner";
 import { ScreenLockProvider } from "@/components/security/ScreenLockModal";
 import { headers } from "next/headers";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
-import { OfflineBanner } from "./components/OfflineBanner";
-import dynamic from "next/dynamic";
-
-const NetworkStatusBar = dynamic(
-  () => import("@/components/network/NetworkStatusBar").then((m) => m.NetworkStatusBar),
-  { ssr: false },
-);
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
+import { HapticProvider } from "@/components/providers/HapticProvider";
+import { PushNotificationRoot } from "@/components/notifications";
+import { RpcFailoverMonitor } from "./components/providers/RpcFailoverMonitor";
 
 export const metadata: Metadata = {
   title: "StellarFlow Network Dashboard",
@@ -128,7 +118,7 @@ export default async function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} antialiased font-sans flex flex-col min-h-screen`}
+        className="antialiased font-sans flex flex-col min-h-screen"
       >
         <OfflineBanner />
         <SvgSprite />
@@ -142,20 +132,26 @@ export default async function RootLayout({
           storageKey="stellarflow-theme"
           disableTransitionOnChange
         >
-          <UserProvider>
-            <QueryProvider>
-              <ProgressBarProvider>
-                  <ToastProvider>
-                    <ErrorBoundary tags={{ section: "root" }}>
-                      <ScreenLockProvider>{children}</ScreenLockProvider>
-                    </ErrorBoundary>
-                  </ToastProvider>
-                  <SwUpdateBanner />
-                  <InstallBanner />
-                  <NetworkStatusBar />
-              </ProgressBarProvider>
-            </QueryProvider>
-          </UserProvider>
+          <AccessibilityProvider>
+            <HapticProvider>
+              <UserProvider>
+                <QueryProvider>
+                  <ProgressBarProvider>
+                      <ToastProvider>
+                        <RpcFailoverMonitor />
+                        <PushNotificationRoot>
+                          <ErrorBoundary tags={{ section: "root" }}>
+                            <ScreenLockProvider>{children}</ScreenLockProvider>
+                          </ErrorBoundary>
+                        </PushNotificationRoot>
+                      </ToastProvider>
+                      <SwUpdateBanner />
+                      <InstallBanner />
+                  </ProgressBarProvider>
+                </QueryProvider>
+              </UserProvider>
+            </HapticProvider>
+          </AccessibilityProvider>
         </ThemeProvider>
       </body>
     </html>

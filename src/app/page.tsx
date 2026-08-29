@@ -6,6 +6,7 @@ import ModularStatsCard from "./components/ModularStatsCard";
 import RelayerStatusTable from "./components/RelayerStatusTable";
 import DashboardInteractive from "./DashboardInteractive";
 import { ErrorBoundary } from "@/components/ui";
+import GuidedTour from "@/components/onboarding/GuidedTour";
 
 const mockRelayers = [
   { id: "r1", name: "Abuja Relayer", status: "Online" as const, latency: 34 },
@@ -99,6 +100,23 @@ export default function Page() {
           </ErrorBoundary>
         </div>
       </main>
+
+      <footer className="border-t border-border bg-surface px-4 py-8 text-foreground sm:px-6 md:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <nav aria-label="Quick access" className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-foreground/70">
+            <a data-tour="tour-swap" href="/" className="transition-colors hover:text-foreground">
+              Swap workspace
+            </a>
+            <a data-tour="tour-liquidity" href="/pools/1" className="transition-colors hover:text-foreground">
+              Liquidity pools
+            </a>
+            <a data-tour="tour-remittance" href="/remittance" className="transition-colors hover:text-foreground">
+              Cross-border remittance
+            </a>
+          </nav>
+          <GuidedTour />
+        </div>
+      </footer>
     </div>
   );
 }

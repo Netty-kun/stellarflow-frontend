@@ -13,6 +13,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
   updatePushPreferences,
+  triggerTestNotification,
   type NotificationPreferences,
 } from "@/services/notifications";
 
@@ -41,6 +42,7 @@ export function NotificationPreferencesModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [supported, setSupported] = useState(true);
+  const [testType, setTestType] = useState<"deposit" | "liquidation_warning" | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -93,6 +95,18 @@ export function NotificationPreferencesModal({
     },
     [prefs, walletAddress, onSaved],
   );
+
+  const handleTestNotification = useCallback(async (type: "deposit" | "liquidation_warning") => {
+    setTestType(type);
+    setError(null);
+    try {
+      await triggerTestNotification(type);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setTestType(null);
+    }
+  }, []);
 
   return (
     <OptimizedDialog
@@ -163,6 +177,18 @@ export function NotificationPreferencesModal({
               </div>
             );
           })}
+        </div>
+
+        <div className="space-y-2 border-t border-gray-800 pt-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Test alert channel</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void handleTestNotification("deposit")} disabled={!prefs.enabled || busy || testType !== null} className="rounded-md border border-gray-700 px-3 py-2 text-xs text-gray-300 hover:border-blue-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50">
+              {testType === "deposit" ? "Sending..." : "Test deposit confirmation"}
+            </button>
+            <button type="button" onClick={() => void handleTestNotification("liquidation_warning")} disabled={!prefs.enabled || busy || testType !== null} className="rounded-md border border-gray-700 px-3 py-2 text-xs text-gray-300 hover:border-amber-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50">
+              {testType === "liquidation_warning" ? "Sending..." : "Test liquidation warning"}
+            </button>
+          </div>
         </div>
 
         {error && (

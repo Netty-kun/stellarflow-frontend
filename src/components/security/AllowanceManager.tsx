@@ -4,28 +4,38 @@ import React, { useMemo, useState } from 'react';
 import Icon from '@/components/icons/Icon';
 import { ICON_IDS } from '@/components/icons/iconIds';
 import { useToast } from '@/components/ui/ToastQueue';
+import { useWallet, useWalletActions } from '@/app/hooks/useWalletState';
 import { scanAccountAllowances, revokeAllowance } from '@/lib/allowanceAuditOps';
 import type { AllowanceRiskLevel, TokenAllowance } from '@/types/allowance';
 
-function useTokenAllowances() {
+function useTokenAllowances(publicKey: string | null | undefined) {
   const [allowances, setAllowances] = useState<TokenAllowance[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scan = React.useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    scanAccountAllowances()
-      .then(setAllowances)
-      .catch((err: unknown) => {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Could not scan account permissions.',
-        );
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
+    if (!publicKey) {
+      setTimeout(() => {
+        setAllowances([]);
+        setIsLoading(false);
+      }, 0);
+      return;
+    }
+    setTimeout(() => {
+      setIsLoading(true);
+      setError(null);
+      scanAccountAllowances(publicKey)
+        .then(setAllowances)
+        .catch((err: unknown) => {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Could not scan account permissions.',
+          );
+        })
+        .finally(() => setIsLoading(false));
+    }, 0);
+  }, [publicKey]);
 
   React.useEffect(() => {
     scan();
@@ -63,16 +73,51 @@ const RISK_STYLES: Record<
 };
 
 export function AllowanceManager() {
-  const { allowances, isLoading, error, rescan, removeMany } = useTokenAllowances();
+  const { wallet } = useWallet();
+  const { refreshWalletState } = useWalletActions();
+  const publicKey = wallet?.publicKey;
+
+  const { allowances, isLoading, error, rescan, removeMany } = useTokenAllowances(publicKey);
   const { addToast, updateToast } = useToast();
   const [revokingIds, setRevokingIds] = useState<Set<string>>(new Set());
   const [isBatchArmed, setIsBatchArmed] = useState(false);
   const [isBatchRunning, setIsBatchRunning] = useState(false);
 
+  const handleConnectWallet = async () => {
+    const state = await refreshWalletState();
+    if (!state?.connected) {
+      alert("No active Stellar wallet detected. Please connect your extension.");
+    }
+  };
+
   const highRiskAllowances = useMemo(
     () => allowances.filter((a) => a.riskLevel === 'high'),
     [allowances],
   );
+
+  if (!publicKey) {
+    return (
+      <div className="w-full max-w-4xl mx-auto p-8 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 text-center py-16">
+        <div className="max-w-md mx-auto space-y-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+            <Icon id={ICON_IDS.shieldAlert} size={32} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Audit & Revoke Allowances</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Please connect your Soroban wallet to scan account spending allowances, review active permissions, and revoke approvals.
+            </p>
+          </div>
+          <button
+            onClick={handleConnectWallet}
+            className="inline-flex items-center justify-center px-6 py-3 font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-md transition-all focus:outline-none"
+          >
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleRevoke = async (id: string) => {
     setRevokingIds((prev) => new Set(prev).add(id));

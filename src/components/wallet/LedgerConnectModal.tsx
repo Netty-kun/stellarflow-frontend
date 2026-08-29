@@ -130,7 +130,8 @@ export function LedgerConnectModal({
       const Str = await import("@ledgerhq/hw-app-str").then((m) => m.default);
       const stellarApp = new Str(transport);
 
-      const { publicKey } = await stellarApp.getPublicKey("44'/148'/0'");
+      const { rawPublicKey } = await stellarApp.getPublicKey("44'/148'/0'");
+      const publicKey = rawPublicKey.toString("hex");
 
       setState((s) => ({
         ...s,
@@ -189,14 +190,18 @@ export function LedgerConnectModal({
         "@stellar/stellar-sdk"
       );
       const tx = TransactionBuilder.fromXDR(txXdr.trim(), Networks.TESTNET);
-      const signatureBuffer = tx.signatureBase();
+      const signatureBuffer = Buffer.from(tx.signatureBase());
 
       const result = await stellarApp.signTransaction(
         "44'/148'/0'",
         signatureBuffer,
       );
 
-      const signedXdr = Buffer.from(result.signature).toString("base64");
+      const signedXdr = Buffer.from(
+        result.signature.buffer as ArrayBuffer,
+        result.signature.byteOffset,
+        result.signature.byteLength,
+      ).toString("base64");
 
       updateToast(toastId, {
         status: "confirmed",
