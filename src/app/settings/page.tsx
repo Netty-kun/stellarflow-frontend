@@ -147,10 +147,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 p-8">
-      <div className="mb-8">
-        <p className="text-sm text-gray-500 mb-1">Admin / Configuration</p>
-        <h1 className="text-3xl font-bold tracking-tight">System Settings</h1>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-6 md:p-10 space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Settings</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Manage your platform preferences and notification settings</p>
       </div>
 
       <div className="max-w-4xl space-y-8">
@@ -550,11 +550,6 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
-
-      {screenLockModalOpen && (
-        <ScreenLockModal isOpen={screenLockModalOpen} onClose={() => setScreenLockModalOpen(false)} />
-      )}
-      <Customizer />
     </div>
   );
 }
