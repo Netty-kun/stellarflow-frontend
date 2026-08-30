@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 const SecurityBanner: React.FC = () => {
   const [baseFee, setBaseFee] = useState<number>(0);
-  const [priority, setPriority] = useState<'low | medium | high>('medium');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [showBanner, setShowBanner] = useState<boolean>(false);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ const SecurityBanner: React.FC = () => {
   }, []);
 
   const handlePriorityChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setPriority(event.target.value as 'low | medium | high');
+    setPriority(event.target.value as 'low' | 'medium' | 'high');
     // In production, this would update the transaction fee priority configuration
   };
 
@@ -38,7 +38,7 @@ const SecurityBanner: React.FC = () => {
   return (
     <div className="security-banner" style={bannerStyle}>
       <span>
-        Network congestion detected! Base fee is {baseFee} stroops (> 1000).
+        Network congestion detected! Base fee is {baseFee} stroops (&gt; 1000).
         Current priority: {priority}.
       </span>
       <select value={priority} onChange={handlePriorityChange}>

@@ -12,6 +12,8 @@ import {
   Loader2,
   KeyRound,
   FileSignature,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 
 export interface MultisigSigner {
@@ -37,6 +39,8 @@ export interface MultisigSignModalProps {
   knownSigners?: MultisigSigner[];
   /** Forward the (partially or fully) signed envelope to a relayer. */
   onForwardToRelayer?: (payload: MultisigForwardPayload) => void | Promise<void>;
+  /** Optional expiry timestamp (Unix seconds) for the pending envelope. */
+  envelopeExpiresAt?: number;
 }
 
 interface OperationSummary {
@@ -170,6 +174,16 @@ function matchSignerLabel(hint: string, signers: MultisigSigner[] | undefined): 
   return match ? match.label ?? match.publicKey : `Unknown signer (hint ${hint})`;
 }
 
+function formatCountdown(seconds: number): string {
+  if (seconds <= 0) return '0s';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -182,6 +196,7 @@ export function MultisigSignModal({
   signatureThreshold,
   knownSigners,
   onForwardToRelayer,
+  envelopeExpiresAt,
 }: MultisigSignModalProps) {
   const [workingXdr, setWorkingXdr] = useState(envelopeXdr);
   const [decoded, setDecoded] = useState<DecodedEnvelope | null>(null);
@@ -194,6 +209,10 @@ export function MultisigSignModal({
   const [isForwarding, setIsForwarding] = useState(false);
   const [forwarded, setForwarded] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Countdown timer state
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [isExpired, setIsExpired] = useState(false);
 
   const decode = useCallback(
     async (xdr: string) => {
@@ -213,12 +232,43 @@ export function MultisigSignModal({
     [networkPassphrase],
   );
 
+  // Countdown timer effect
+  useEffect(() => {
+    if (!envelopeExpiresAt) {
+      const timer = setTimeout(() => {
+        setTimeRemaining(null);
+        setIsExpired(false);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
+    const updateTimer = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const remaining = envelopeExpiresAt - now;
+      if (remaining <= 0) {
+        setTimeRemaining(0);
+        setIsExpired(true);
+      } else {
+        setTimeRemaining(remaining);
+        setIsExpired(false);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [envelopeExpiresAt]);
+
   useEffect(() => {
     if (!isOpen) return;
-    setWorkingXdr(envelopeXdr);
-    setForwarded(false);
-    setSignError(null);
-    void decode(envelopeXdr);
+    // Use a timeout to avoid synchronous setState in effect
+    const timer = setTimeout(() => {
+      setWorkingXdr(envelopeXdr);
+      setForwarded(false);
+      setSignError(null);
+      void decode(envelopeXdr);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [isOpen, envelopeXdr, decode]);
 
   const handleSign = async () => {
@@ -344,6 +394,37 @@ export function MultisigSignModal({
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
+                
+                {/* Expiration countdown timer */}
+                {envelopeExpiresAt && !isExpired && timeRemaining !== null && (
+                  <div className="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    <Clock size={12} className="shrink-0" />
+                    <span>
+                      Expires in {formatCountdown(timeRemaining)}
+                      {signatureCount < signatureThreshold && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                          {signatureThreshold - signatureCount} signature{signatureThreshold - signatureCount !== 1 ? 's' : ''} remaining
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Expired status overlay */}
+                {isExpired && (
+                  <div className="flex items-center gap-2 text-xs font-medium text-red-600 dark:text-red-400">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span className="flex items-center gap-1">
+                      Envelope expired — threshold not met
+                      {signatureCount < signatureThreshold && (
+                        <span className="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                          {signatureThreshold - signatureCount} signature{signatureThreshold - signatureCount !== 1 ? 's' : ''} needed
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+
                 {decoded.signatureHints.length > 0 && (
                   <ul className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
                     {decoded.signatureHints.map((hint, idx) => (
@@ -446,11 +527,11 @@ export function MultisigSignModal({
           <button
             type="button"
             onClick={handleForward}
-            disabled={!thresholdMet || isForwarding || forwarded}
+            disabled={!thresholdMet || isForwarding || forwarded || isExpired}
             className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 font-medium transition-colors"
           >
             {isForwarding ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            {forwarded ? 'Forwarded' : 'Forward to Relayer'}
+            {forwarded ? 'Forwarded' : isExpired ? 'Expired' : 'Forward to Relayer'}
           </button>
         </div>
       </div>

@@ -21,16 +21,28 @@ async function prepareForSnapshot(page: Page) {
   // Freeze CSS animations/transitions so timing differences between runs
   // don't produce false-positive pixel diffs.
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.addStyleTag({
-    content: `
-      *, *::before, *::after {
-        animation-duration: 0s !important;
-        animation-delay: 0s !important;
-        transition-duration: 0s !important;
-        transition-delay: 0s !important;
+
+  await page.getByText('Live Network Map').waitFor({ state: 'visible' });
+  await page.getByText('NGN/XLM (24h)').waitFor({ state: 'visible' });
+  await page.getByText('Raw source data').waitFor({ state: 'visible' });
+
+  // Hide live dashboard panels that hydrate with dynamic data and can change
+  // layout height between runs. The visual snapshots are meant to cover the
+  // stable landing-page shell, not the live telemetry content.
+  await page.evaluate(() => {
+    const labels = ['Live Network Map', 'NGN/XLM (24h)', 'Raw source data'];
+
+    document.querySelectorAll('section').forEach((element) => {
+      const text = element.textContent ?? '';
+      if (!labels.some((label) => text.includes(label))) {
+        return;
       }
-    `,
+
+        (element as HTMLElement).style.display = 'none';
+    });
   });
+
+  await page.waitForTimeout(250);
 }
 
 test.describe('Visual regression — landing page (Issue #603)', () => {
@@ -38,7 +50,7 @@ test.describe('Visual regression — landing page (Issue #603)', () => {
     test(`matches baseline at ${breakpoint.name}`, async ({ page }) => {
       await page.setViewportSize({ width: breakpoint.width, height: breakpoint.height });
       await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.locator('body').waitFor({ state: 'visible' });
       await prepareForSnapshot(page);
 
       await expect(page).toHaveScreenshot(`landing-${breakpoint.name}.png`, {

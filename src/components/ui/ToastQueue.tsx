@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Icon from "@/components/icons/Icon";
 import { ICON_IDS, IconId } from "@/components/icons/iconIds";
 import { useTransactionAudio } from "@/hooks/useTransactionAudio";
+import { triggerHaptic } from "@/lib/haptics";
 
 export type ToastStatus = "submitted" | "processing" | "confirmed" | "failed";
 
@@ -48,16 +49,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const timeouts = useRef<Record<string, NodeJS.Timeout>>({});
   const { playSuccess, playFailure } = useTransactionAudio();
 
-  // Play a chime whenever a toast's status transitions to confirmed/failed,
-  // tracked outside of setState so the sound is a side effect, not a state
+  // Play a chime and trigger tactile haptic cues whenever a toast's status transitions,
+  // tracked outside of setState so the sound/haptic is a side effect, not a state
   // update (avoids double-firing under React strict mode).
   const lastPlayedStatus = useRef<Record<string, ToastStatus>>({});
   useEffect(() => {
     for (const toast of toasts) {
       if (lastPlayedStatus.current[toast.id] === toast.status) continue;
       lastPlayedStatus.current[toast.id] = toast.status;
-      if (toast.status === "confirmed") playSuccess();
-      else if (toast.status === "failed") playFailure();
+      if (toast.status === "submitted" || toast.status === "confirmed") {
+        triggerHaptic("txConfirm");
+        if (toast.status === "confirmed") playSuccess();
+      } else if (toast.status === "failed") {
+        triggerHaptic("error");
+        playFailure();
+      }
     }
   }, [toasts, playSuccess, playFailure]);
 

@@ -42,12 +42,22 @@ export interface BridgeTransferRecord {
   initiatedAt: string;
   status: BridgeTransferStatus;
   failureReason: BridgeFailureReason;
+  /** Validator signatures required before the bridge can release funds. */
+  signatureThreshold: number;
   /** Hash/tx id of the original locking transaction on the origin chain */
   originTxHash: string;
   /** Highest unlock stage reached so far, once a refund has been triggered */
   unlockStage: BridgeUnlockStage | null;
   /** Populated once `unlockStage` reaches "funds_returned" */
   refundTxHash?: string;
+}
+
+export type BridgeValidatorApprovalStatus = "approved" | "pending" | "timed_out";
+
+export interface BridgeValidatorApproval {
+  id: string;
+  name: string;
+  status: BridgeValidatorApprovalStatus;
 }
 
 export const FAILURE_REASON_LABELS: Record<BridgeFailureReason, string> = {

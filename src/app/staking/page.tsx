@@ -22,6 +22,7 @@ import {
   StakerTableRow,
   type StakerTableRecord,
 } from '@/app/components/staking/StakerTableRow';
+import { AutoCompoundScheduler } from '@/app/components/staking/AutoCompoundScheduler';
 
 // Lazily load the BondAllocationCalculator — it pulls in SliderRow and heavy
 // calculation logic that is not needed for the above-the-fold table view.
@@ -208,6 +209,9 @@ export default function StakingPage() {
           </table>
         </div>
       </div>
+
+      {/* --- Auto-Compound Scheduler --- */}
+      <AutoCompoundScheduler />
 
       {/* --- Slashing Invariants Warning Section --- */}
       <div className="mt-6 p-4 bg-yellow-950/20 border border-yellow-900/30 rounded-xl flex gap-4 items-start">

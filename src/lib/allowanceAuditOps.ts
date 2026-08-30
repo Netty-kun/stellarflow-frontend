@@ -75,8 +75,9 @@ function delay(ms: number): Promise<void> {
 }
 
 /** Scans every connected smart contract instance for active spend approvals. */
-export async function scanAccountAllowances(): Promise<TokenAllowance[]> {
+export async function scanAccountAllowances(publicKey: string): Promise<TokenAllowance[]> {
   await delay(700);
+  console.log(`Scanning allowances for public key: ${publicKey}`);
   return MOCK_ALLOWANCES.map((a) => ({ ...a }));
 }
 

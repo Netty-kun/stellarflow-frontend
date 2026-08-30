@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useWallet } from '@/app/components/providers/WalletProvider';
+import { useWallet, useWalletActions } from '@/app/components/providers/WalletProvider';
 import { useSwapExecution } from '@/hooks/useSwapExecution';
 import { formatTokenAmount } from '@/utils/formatters';
 import { PathVisualizer } from './PathVisualizer';
@@ -18,7 +18,10 @@ interface SwapFormProps {
 }
 
 export const SwapForm: React.FC<SwapFormProps> = ({ tokens, onSwapSuccess }) => {
-  const { isConnected, connectWallet, address } = useWallet();
+  const { wallet } = useWallet();
+  const { refreshWalletState } = useWalletActions();
+  const isConnected = wallet?.connected || false;
+  const address = wallet?.publicKey || '';
   const { executeSwap, isSwapping } = useSwapExecution();
 
   const [fromToken, setFromToken] = useState<TokenOption>(tokens[0]);
@@ -36,11 +39,11 @@ export const SwapForm: React.FC<SwapFormProps> = ({ tokens, onSwapSuccess }) => 
 
   // Fetch token balances on asset or account change
   const fetchBalances = useCallback(async () => {
-    if (!isConnected || !address) return;
+    if (!wallet?.connected || !wallet.publicKey) return;
     try {
       const [resFrom, resTo] = await Promise.all([
-        fetch(`/api/v1/balances?account=${address}&token=${fromToken.address}`),
-        fetch(`/api/v1/balances?account=${address}&token=${toToken.address}`),
+        fetch(`/api/v1/balances?account=${wallet.publicKey}&token=${fromToken.address}`),
+        fetch(`/api/v1/balances?account=${wallet.publicKey}&token=${toToken.address}`),
       ]);
       const dataFrom = await resFrom.json();
       const dataTo = await resTo.json();
@@ -50,7 +53,7 @@ export const SwapForm: React.FC<SwapFormProps> = ({ tokens, onSwapSuccess }) => 
     } catch (err) {
       console.error('Error fetching token balances:', err);
     }
-  }, [isConnected, address, fromToken, toToken]);
+  }, [wallet?.connected, wallet?.publicKey, fromToken, toToken]);
 
   useEffect(() => {
     fetchBalances();
@@ -112,20 +115,15 @@ export const SwapForm: React.FC<SwapFormProps> = ({ tokens, onSwapSuccess }) => 
   const isValidAmount = parsedFromAmount > 0;
 
   const submitButtonState = useMemo(() => {
-    if (!isConnected) return { text: 'Connect Wallet', disabled: false, action: connectWallet };
+    if (!isConnected) return { text: 'Connect Wallet', disabled: false, action: refreshWalletState };
     if (!isValidAmount) return { text: 'Enter an Amount', disabled: true };
     if (hasInsufficientBalance) return { text: `Insufficient ${fromToken.symbol} Balance`, disabled: true };
     if (isSwapping) return { text: 'Executing Swap...', disabled: true };
     return { text: 'Swap Tokens', disabled: false };
-  }, [isConnected, isValidAmount, hasInsufficientBalance, isSwapping, fromToken.symbol, connectWallet]);
+  }, [isConnected, isValidAmount, hasInsufficientBalance, isSwapping, fromToken.symbol, refreshWalletState]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitButtonState.action) {
-      submitButtonState.action();
-      return;
-    }
-
     if (submitButtonState.disabled) return;
 
     try {

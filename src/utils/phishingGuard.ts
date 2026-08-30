@@ -92,7 +92,7 @@ async function checkAccountAge(
   try {
     const account = await server.accounts().accountId(address).call();
     const createdAt = new Date(
-      (account as Record<string, unknown>).last_modified_time as string,
+      ((account as unknown) as Record<string, unknown>).last_modified_time as string,
     ).getTime();
     const ageMs = Date.now() - createdAt;
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;

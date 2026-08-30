@@ -8,6 +8,7 @@ import {
 import type {
   BridgeTransferRecord,
   BridgeUnlockStage,
+  BridgeValidatorApproval,
 } from "@/types/bridge";
 import { BRIDGE_UNLOCK_STAGES } from "@/types/bridge";
 
@@ -21,6 +22,9 @@ export interface RefundProgress {
   isDone: boolean;
   refundTxHash: string | null;
   error: string | null;
+  gatheredSignatures: number;
+  requiredSignatures: number;
+  validators: BridgeValidatorApproval[];
 }
 
 interface UseBridgeRefundsResult {
@@ -82,6 +86,9 @@ export function useBridgeRefunds(): UseBridgeRefundsResult {
         isDone: false,
         refundTxHash: null,
         error: null,
+        gatheredSignatures: 0,
+        requiredSignatures: transfer.signatureThreshold,
+        validators: [],
       },
     }));
 
@@ -94,6 +101,9 @@ export function useBridgeRefunds(): UseBridgeRefundsResult {
           isDone: false,
           refundTxHash: null,
           error: null,
+          gatheredSignatures: update.gatheredSignatures,
+          requiredSignatures: update.requiredSignatures,
+          validators: update.validators,
         },
       }));
     })
@@ -107,6 +117,9 @@ export function useBridgeRefunds(): UseBridgeRefundsResult {
             isDone: true,
             refundTxHash,
             error: null,
+            gatheredSignatures: 3,
+            requiredSignatures: transfer.signatureThreshold,
+            validators: prev[transfer.id]?.validators ?? [],
           },
         }));
         setTransfers((prev) =>
@@ -134,6 +147,10 @@ export function useBridgeRefunds(): UseBridgeRefundsResult {
               err instanceof Error
                 ? err.message
                 : "Refund claim failed. Please try again.",
+            gatheredSignatures: prev[transfer.id]?.gatheredSignatures ?? 0,
+            requiredSignatures:
+              prev[transfer.id]?.requiredSignatures ?? transfer.signatureThreshold,
+            validators: prev[transfer.id]?.validators ?? [],
           },
         }));
       });

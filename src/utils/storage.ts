@@ -146,16 +146,18 @@ export function getItem<T>(
       return fallbackValue !== undefined ? fallbackValue : null;
     }
 
-    if (envelope.version < APP_STORAGE_VERSION) {
+    const envelopeVersion = Number(envelope.version);
+
+    if (envelopeVersion < APP_STORAGE_VERSION) {
       // Run migrations (if any migrations exist, or reset outdated storage)
-      console.info(`Migrating storage key ${key} from version ${envelope.version} to ${APP_STORAGE_VERSION}`);
-      const migratedData = runMigrations(key, envelope.data, envelope.version);
+      console.info(`Migrating storage key ${key} from version ${envelopeVersion} to ${APP_STORAGE_VERSION}`);
+      const migratedData = runMigrations(key, envelope.data, envelopeVersion);
       if (migratedData === null) {
         removeItem(key);
         return fallbackValue !== undefined ? fallbackValue : null;
       }
       setItem(key, migratedData);
-      envelope.data = migratedData;
+      envelope.data = migratedData as T;
     }
 
     // Schema Validation Check

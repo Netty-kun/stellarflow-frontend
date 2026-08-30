@@ -24,29 +24,24 @@ interface StepDisplayMeta {
 }
 
 const STEP_DISPLAY: Record<RemittanceStep, StepDisplayMeta> = {
-  deposited: {
-    label: "Deposited",
-    description: "Funds received and confirmed on-chain.",
+  payment_initiated: {
+    label: "Payment Initiated",
+    description: "Your transfer has been initiated and is processing.",
     iconId: ICON_IDS.wallet,
   },
-  swap_completed: {
-    label: "Swap Completed",
-    description: "XLM ↔ local currency swap executed.",
-    iconId: ICON_IDS.zap,
-  },
-  anchor_processing: {
-    label: "Anchor Processing",
-    description: "Licensed anchor validating the off-ramp request.",
+  escrow_locked: {
+    label: "Escrow Locked",
+    description: "Funds locked securely on-chain in Stellar escrow.",
     iconId: ICON_IDS.shield,
   },
-  offramp_dispatched: {
-    label: "Off-Ramp Dispatched",
-    description: "Payment instruction sent to local payout rail.",
+  anchor_dispatched: {
+    label: "Anchor Dispatched",
+    description: "Licensed anchor dispatched off-ramp payout instruction.",
     iconId: ICON_IDS.upload,
   },
-  delivered: {
-    label: "Delivered",
-    description: "Funds landed in the recipient's account.",
+  fiat_received: {
+    label: "Fiat Received",
+    description: "Recipient has received local currency cashout.",
     iconId: ICON_IDS.checkCircle,
   },
 };
@@ -61,6 +56,7 @@ interface StepNodeProps {
   active: boolean;
   failed: boolean;
   txHash?: string;
+  anchorTrackingUrl?: string;
   completedAt?: string;
   network?: "mainnet" | "testnet";
   isLast: boolean;
@@ -72,6 +68,7 @@ const StepNode = React.memo(function StepNode({
   active,
   failed,
   txHash,
+  anchorTrackingUrl,
   completedAt,
   network = "mainnet",
   isLast,
@@ -213,6 +210,21 @@ const StepNode = React.memo(function StepNode({
             <Icon id={ICON_IDS.externalLink} size={11} className="flex-shrink-0" />
             {txHash.slice(0, 8)}…{txHash.slice(-8)}
           </a>
+        )}
+
+        {/* Anchor tracking link */}
+        {anchorTrackingUrl && (
+          <div className="mt-1.5">
+            <a
+              href={anchorTrackingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-500 hover:text-emerald-400 underline-offset-2 hover:underline transition-colors"
+            >
+              <Icon id={ICON_IDS.externalLink} size={11} className="flex-shrink-0" />
+              Track Anchor Payout Leg
+            </a>
+          </div>
         )}
       </div>
     </li>
@@ -383,7 +395,7 @@ export const StatusStepper = React.memo(function StatusStepper({
   };
 
   const isFailed = phase === "failed";
-  const isDelivered = currentStep === "delivered" && phase === "completed";
+  const isDelivered = currentStep === "fiat_received" && phase === "completed";
 
   // Build a stable list of step props for rendering — avoids per-render object churn.
   const steps = useMemo(
@@ -394,6 +406,7 @@ export const StatusStepper = React.memo(function StatusStepper({
         active: isStepActive(step, currentStep),
         failed: isFailed && isStepActive(step, currentStep),
         txHash: stepMeta[step]?.txHash,
+        anchorTrackingUrl: stepMeta[step]?.anchorTrackingUrl,
         completedAt: stepMeta[step]?.completedAt,
         isLast: i === REMITTANCE_STEPS.length - 1,
       })),

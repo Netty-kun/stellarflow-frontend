@@ -38,7 +38,7 @@ import { ICON_IDS } from "@/components/icons/iconIds";
  * without a live backend. Remove / disable when connecting to a real API.
  */
 function useMockStatus(txId: string): RemittanceStatus {
-  const [stepIdx, setStepIdx] = useState(1); // start at "swap_completed" for interest
+  const [stepIdx, setStepIdx] = useState(1); // start at "escrow_locked" for interest
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -56,44 +56,38 @@ function useMockStatus(txId: string): RemittanceStatus {
     currentStep,
     phase: stepIdx === REMITTANCE_STEPS.length - 1 ? "completed" : "active",
     stepMeta: {
-      deposited: {
-        step: "deposited",
+      payment_initiated: {
+        step: "payment_initiated",
         completedAt: new Date(Date.now() - 8 * 60_000).toISOString(),
         txHash:
           "3b6a9f4e7d2c1e0f8a5b4c9d3e7f2a1b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f",
       },
-      swap_completed:
+      escrow_locked:
         stepIdx >= 1
           ? {
-              step: "swap_completed",
+              step: "escrow_locked",
               completedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
               txHash:
                 "9d1a2b3c4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b",
             }
           : undefined,
-      anchor_processing:
+      anchor_dispatched:
         stepIdx >= 2
           ? {
-              step: "anchor_processing",
+              step: "anchor_dispatched",
               completedAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+              anchorTrackingUrl: "https://kotanipay.com/track/KTN-KE-40217",
             }
           : undefined,
-      offramp_dispatched:
+      fiat_received:
         stepIdx >= 3
           ? {
-              step: "offramp_dispatched",
-              completedAt: new Date(Date.now() - 30_000).toISOString(),
-            }
-          : undefined,
-      delivered:
-        stepIdx >= 4
-          ? {
-              step: "delivered",
+              step: "fiat_received",
               completedAt: new Date().toISOString(),
             }
           : undefined,
     },
-    estimatedDeliveryMs: stepIdx < 4 ? Date.now() + 4 * 60_000 : undefined,
+    estimatedDeliveryMs: stepIdx < 3 ? Date.now() + 4 * 60_000 : undefined,
   };
 }
 
@@ -250,7 +244,7 @@ function PageShell({
           Remittance Tracker
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Real-time progress across five stages from deposit to delivery.
+          Real-time progress across four stages from initiation to fiat delivery.
         </p>
       </div>
 

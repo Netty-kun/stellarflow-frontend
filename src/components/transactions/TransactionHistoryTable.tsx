@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Icon from "@/components/icons/Icon";
 import { ICON_IDS } from "@/components/icons/iconIds";
 import { useToast } from "@/components/ui/ToastQueue";
-import { exportTransactionsToCsv } from "@/utils/csvExport";
+import { exportTransactionsToCsv, type TaxPlatform } from "@/utils/csvExport";
 import { useTransactionHistoryWithFallback } from "@/app/hooks/useTransactionHistory";
 import type { TransactionRecord, TransactionType } from "@/types/transactions";
 
@@ -13,6 +13,12 @@ const TYPE_FILTERS: { label: string; value: "all" | TransactionType }[] = [
   { label: "Swaps", value: "swap" },
   { label: "Liquidity", value: "liquidity" },
   { label: "Remittances", value: "remittance" },
+];
+
+const EXPORT_PLATFORMS: { label: string; value: TaxPlatform }[] = [
+  { label: "Standard CSV", value: "standard" },
+  { label: "Koinly", value: "koinly" },
+  { label: "CoinTracker", value: "cointracker" },
 ];
 
 const STATUS_STYLES: Record<TransactionRecord["status"], string> = {
@@ -37,6 +43,7 @@ export default function TransactionHistoryTable() {
   const { data: transactions, isLoading } = useTransactionHistoryWithFallback();
   const { addToast, updateToast } = useToast();
   const [typeFilter, setTypeFilter] = useState<"all" | TransactionType>("all");
+  const [exportPlatform, setExportPlatform] = useState<TaxPlatform>("standard");
   const [isExporting, setIsExporting] = useState(false);
 
   const filteredTransactions = useMemo(
@@ -53,15 +60,15 @@ export default function TransactionHistoryTable() {
     setIsExporting(true);
     const toastId = addToast({
       title: "Preparing CSV export",
-      description: `Formatting ${filteredTransactions.length} transactions for download…`,
+      description: `Formatting ${filteredTransactions.length} transactions for ${EXPORT_PLATFORMS.find(p => p.value === exportPlatform)?.label}…`,
       status: "processing",
     });
 
     try {
-      await exportTransactionsToCsv(filteredTransactions);
+      await exportTransactionsToCsv(filteredTransactions, { platform: exportPlatform });
       updateToast(toastId, {
         title: "Export ready",
-        description: `${filteredTransactions.length} transactions downloaded as CSV.`,
+        description: `${filteredTransactions.length} transactions downloaded as ${EXPORT_PLATFORMS.find(p => p.value === exportPlatform)?.label} CSV.`,
         status: "confirmed",
       });
     } catch {
@@ -96,6 +103,20 @@ export default function TransactionHistoryTable() {
             {TYPE_FILTERS.map((filter) => (
               <option key={filter.value} value={filter.value}>
                 {filter.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={exportPlatform}
+            onChange={(event) =>
+              setExportPlatform(event.target.value as TaxPlatform)
+            }
+            className="rounded-md border border-gray-700 bg-[#0d1117] px-3 py-2 text-sm text-gray-300 focus:border-blue-500 focus:outline-none"
+          >
+            {EXPORT_PLATFORMS.map((platform) => (
+              <option key={platform.value} value={platform.value}>
+                {platform.label}
               </option>
             ))}
           </select>

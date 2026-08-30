@@ -197,7 +197,7 @@ export default function AssetBreakdownStackedBar({
             grid: { display: false },
             ticks: {
               color: "rgba(255,255,255,0.70)",
-              font: { size: 12, weight: "600" },
+              font: { size: 12, weight: 600 },
             },
             border: { color: "transparent" },
           },

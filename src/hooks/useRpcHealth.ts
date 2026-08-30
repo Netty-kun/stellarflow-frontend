@@ -49,12 +49,17 @@ export interface UseRpcHealthReturn {
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 15_000;
-const DEFAULT_DEGRADED_THRESHOLD_MS = 800;
+const DEFAULT_OPTIMAL_THRESHOLD_MS = 200;
+const DEFAULT_DEGRADED_THRESHOLD_MS = 500;
 const DEFAULT_TIMEOUT_MS = 6_000;
 
-function classify(latencyMs: number, degradedThresholdMs: number): RpcHealthStatus {
-  if (latencyMs <= degradedThresholdMs) return "healthy";
-  if (latencyMs <= degradedThresholdMs * 2.5) return "degraded";
+function classify(
+  latencyMs: number,
+  degradedThresholdMs = DEFAULT_DEGRADED_THRESHOLD_MS,
+  optimalThresholdMs = DEFAULT_OPTIMAL_THRESHOLD_MS,
+): RpcHealthStatus {
+  if (latencyMs < optimalThresholdMs) return "healthy";
+  if (latencyMs <= degradedThresholdMs) return "degraded";
   return "unhealthy";
 }
 
