@@ -14,6 +14,7 @@ import { InstallBanner } from "./components/InstallBanner";
 import { OfflineBanner } from "./components/OfflineBanner";
 import { SwUpdateBanner } from "@/components/pwa/SwUpdateBanner";
 import { ScreenLockProvider } from "@/components/security/ScreenLockModal";
+import { GasFeeProvider } from "@/components/gas-fee";
 import { headers } from "next/headers";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { HapticProvider } from "@/components/providers/HapticProvider";
