@@ -18,6 +18,7 @@
 import type {
   BridgeTransferRecord,
   BridgeUnlockStage,
+  BridgeValidatorApproval,
 } from "@/types/bridge";
 import { BRIDGE_UNLOCK_STAGES } from "@/types/bridge";
 
@@ -31,6 +32,7 @@ const MOCK_TRANSFERS: BridgeTransferRecord[] = [
     initiatedAt: "2026-08-24T10:12:00Z",
     status: "failed",
     failureReason: "validator_timeout",
+    signatureThreshold: 3,
     originTxHash:
       "0x7f9a3c1e2b4d5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a",
     unlockStage: null,
@@ -44,6 +46,7 @@ const MOCK_TRANSFERS: BridgeTransferRecord[] = [
     initiatedAt: "2026-08-22T18:44:00Z",
     status: "failed",
     failureReason: "threshold_not_met",
+    signatureThreshold: 3,
     originTxHash:
       "0x3b6a9f4e7d2c1e0f8a5b4c9d3e7f2a1b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f",
     unlockStage: null,
@@ -57,6 +60,7 @@ const MOCK_TRANSFERS: BridgeTransferRecord[] = [
     initiatedAt: "2026-08-18T07:05:00Z",
     status: "refunded",
     failureReason: "validator_timeout",
+    signatureThreshold: 3,
     originTxHash:
       "0x9d1a2b3c4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b",
     unlockStage: "funds_returned",
@@ -82,6 +86,9 @@ export interface RefundProgressUpdate {
   /** True once this stage has completed */
   completed: boolean;
   message: string;
+  gatheredSignatures: number;
+  requiredSignatures: number;
+  validators: BridgeValidatorApproval[];
 }
 
 const STAGE_MESSAGES: Record<BridgeUnlockStage, string> = {
@@ -101,10 +108,42 @@ export async function triggerBridgeRefund(
   transfer: BridgeTransferRecord,
   onProgress: (update: RefundProgressUpdate) => void,
 ): Promise<string> {
+  const validators: BridgeValidatorApproval[] = [
+    { id: "validator-1", name: "Atlas", status: "pending" },
+    { id: "validator-2", name: "Meridian", status: "pending" },
+    { id: "validator-3", name: "Northstar", status: "pending" },
+    { id: "validator-4", name: "Aegis", status: "pending" },
+    { id: "validator-5", name: "Helios", status: "pending" },
+  ];
+  let gatheredSignatures = 0;
+
   for (const stage of BRIDGE_UNLOCK_STAGES) {
-    onProgress({ stage, completed: false, message: STAGE_MESSAGES[stage] });
+    onProgress({
+      stage,
+      completed: false,
+      message: STAGE_MESSAGES[stage],
+      gatheredSignatures,
+      requiredSignatures: transfer.signatureThreshold,
+      validators: validators.map((validator) => ({ ...validator })),
+    });
     await delay(1_100);
-    onProgress({ stage, completed: true, message: STAGE_MESSAGES[stage] });
+    if (stage === "validator_attestation") {
+      validators[0].status = "approved";
+      validators[1].status = "approved";
+      validators[2].status = "approved";
+      gatheredSignatures = 3;
+      if (transfer.failureReason === "validator_timeout") {
+        validators[4].status = "timed_out";
+      }
+    }
+    onProgress({
+      stage,
+      completed: true,
+      message: STAGE_MESSAGES[stage],
+      gatheredSignatures,
+      requiredSignatures: transfer.signatureThreshold,
+      validators: validators.map((validator) => ({ ...validator })),
+    });
   }
 
   return `0x${transfer.originTxHash.slice(2, 10)}refund${Date.now().toString(16)}`;

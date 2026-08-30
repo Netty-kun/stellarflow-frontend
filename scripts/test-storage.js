@@ -16,7 +16,7 @@ try {
   cleanup();
   
   // Compile the TS file to ES6/CommonJS JS file in scripts/temp
-  execSync(`npx tsc src/utils/storage.ts --outDir scripts/temp --target es6 --module commonjs`, {
+  execSync(`npx tsc src/utils/storage.ts --rootDir . --outDir scripts/temp --target es6 --module commonjs --skipLibCheck`, {
     cwd: path.join(__dirname, ".."),
     stdio: "inherit",
   });
