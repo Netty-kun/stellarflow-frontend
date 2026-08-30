@@ -80,6 +80,9 @@ export const ICON_IDS = {
   save:       "icon-save",
   rotateCcw:  "icon-rotate-ccw",
   volume2:    "icon-volume-2",
+  sun:        "icon-sun",
+  moon:       "icon-moon",
+  monitor:    "icon-monitor",
 
   // Governance page
   xCircle:    "icon-x-circle",
