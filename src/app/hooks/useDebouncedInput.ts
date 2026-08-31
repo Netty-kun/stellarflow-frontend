@@ -11,7 +11,7 @@ import { useDebounce } from "./useDebounce";
  * @param initial Initial value of the input.
  * @param delay Debounce delay in milliseconds (default 250ms).
  */
-export function useDebouncedInput<T>(initial: T, delay = 250) {
+export function useDebouncedInput<T>(initial: T, delay = 300) {
   const [value, setValue] = useState<T>(initial);
   const debounced = useDebounce<T>(value, delay);
   return { value, setValue, debounced };
