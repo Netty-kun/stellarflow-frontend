@@ -8,10 +8,11 @@
  * in nav.jsx, keeping WalletProvider out of the initial nav chunk.
  */
 
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useState } from "react";
 import Icon from "@/components/icons/Icon";
 import { ICON_IDS } from "@/components/icons/iconIds";
 import { useProgressBar } from "./TopLoadingBar";
+import { WalletQRCode } from "@/components/ui/WalletQRCode";
 import {
   WalletProvider,
   useWallet,
