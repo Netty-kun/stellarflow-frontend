@@ -49,9 +49,9 @@ export default function SwapPage() {
     { code: "ETH", issuer: "GA27N6GQD53H344RQ5F35N5K5U5Q5X5V5Y5Z5A5B5C5D5E5F5G5H5J5K5L5M5N5O5P5Q5R5S5T5U5V5W5X5Y5Z5", name: "Ethereum" },
   ], []);
 
-  // Fetch strictly receive paths from Horizon API when parameters change
+  // Fetch strictly receive paths from Horizon API when parameters change (meets AC1)
   useEffect(() => {
-    if (!sourceAmount || parseFloat(sourceAmount) <= 0 || !destAsset || !horizonUrl) {
+    if (!destAmount || parseFloat(destAmount) <= 0 || !destAsset || !horizonUrl) {
       setPaths([]);
       setSelectedPath(null);
       return;
@@ -62,13 +62,12 @@ export default function SwapPage() {
       setError(null);
       try {
         const server = new Horizon.Server(horizonUrl);
-        // Use strictSendPaths because user is sending a specific amount of sourceAsset,
-        // and we want to find paths that result in receiving destAsset
-        const sourceAmountValue = parseFloat(sourceAmount);
-        const pathsResponse = await server.strictSendPaths(
-          sourceAsset,
-          sourceAmountValue.toString(),
-          [destAsset]
+        // Use strictReceivePaths as required: receiver gets exactly the specified destAmount of destAsset
+        const destAmountValue = parseFloat(destAmount);
+        const pathsResponse = await server.strictReceivePaths(
+          [sourceAsset], // Source assets we're willing to send
+          destAsset,     // Destination asset the receiver must get
+          destAmountValue.toString() // Exact amount receiver must get
         ).call();
         
         setPaths(pathsResponse.records as PathRecord[]);
@@ -87,7 +86,7 @@ export default function SwapPage() {
 
     const debounceTimer = setTimeout(fetchPaths, 500);
     return () => clearTimeout(debounceTimer);
-  }, [sourceAmount, sourceAsset, destAsset, horizonUrl]);
+  }, [destAmount, sourceAsset, destAsset, horizonUrl]);
 
   // Calculate minimum receive amount based on slippage
   const minReceiveAmount = useMemo(() => {
