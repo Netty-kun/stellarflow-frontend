@@ -14,6 +14,7 @@ import { CorridorProvider } from "@/context/CorridorContext";
 import { TelemetryProvider } from "@/context/TelemetryContext";
 import { ASSET_SYMBOLS } from "@/config/assetSymbols";
 import { ErrorBoundary } from "@/components/ui";
+import GasPriceEstimator from "./components/GasPriceEstimator";
 
 const LiveNetworkMap = dynamic(() => import("@/app/components/Map"), {
   ssr: false,
@@ -291,6 +292,10 @@ export default function DashboardInteractive({
       {/* Local FX rates — static props from server, shielded by memo */}
       <ErrorBoundary name="FXRateCards">
         <RateCardSection rateCards={rateCards} cardsReady={cardsReady} />
+      </ErrorBoundary>
+
+      <ErrorBoundary name="GasPriceEstimator">
+        <GasPriceEstimator />
       </ErrorBoundary>
 
       {/*
