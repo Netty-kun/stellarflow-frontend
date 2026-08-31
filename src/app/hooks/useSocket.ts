@@ -9,6 +9,12 @@ import { useRAFInterval } from "./useRAFInterval";
 import type { AssetSymbol } from "@/config/assetSymbols";
 import { WebSocketManager } from "@/utils/WebSocketManager";
 
+export type PayoutStatus = {
+  transactionId: string;
+  status: "PROCESSING" | "DISPATCHED" | "DELIVERED" | "REJECTED";
+  error?: string;
+};
+
 export interface UseSocketOptions {
   assetIds?: AssetSymbol[];
   enableDeltaUpdates?: boolean;
@@ -20,6 +26,7 @@ export interface UseSocketOptions {
 export interface UseSocketReturn {
   isConnected: boolean;
   lastUpdate: PriceData | null;
+  payoutStatus: PayoutStatus | null;
   error: string | null;
   reconnectAttempts: number;
   subscribeToAsset: (assetId: string) => void;
@@ -38,6 +45,7 @@ function useSocketState(options: UseSocketOptions): UseSocketReturn {
 
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<PriceData | null>(null);
+  const [payoutStatus, setPayoutStatus] = useState<PayoutStatus | null>(null);
   const { error, setError } = useErrorTimeout({ timeoutMs: errorTimeoutMs });
 
   // Track which assets this consumer instance has subscribed to so that
@@ -129,8 +137,24 @@ function useSocketState(options: UseSocketOptions): UseSocketReturn {
   // reconcile.
   // ------------------------------------------------------------------
   useEffect(() => {
-    const handleIncomingData = (data: PriceData | Partial<PriceData>) => {
+    const handleIncomingData = (data: any) => {
       if (!isVisible) return;
+      if (
+        data &&
+        typeof data === "object" &&
+        "type" in data &&
+        data.type === "payout_status"
+      ) {
+        const { transactionId, status, error } = data;
+        if (transactionId && status) {
+          setPayoutStatus({
+            transactionId,
+            status,
+            error,
+          });
+        }
+        return;
+      }
       pendingUpdatesRef.current.push(data);
     };
 
@@ -176,6 +200,7 @@ function useSocketState(options: UseSocketOptions): UseSocketReturn {
   return {
     isConnected,
     lastUpdate,
+    payoutStatus,
     error,
     reconnectAttempts: 0,
     subscribeToAsset,
@@ -216,6 +241,7 @@ export function useSocket<Selected = UseSocketReturn>(
       selector,
       state.isConnected,
       state.lastUpdate,
+      state.payoutStatus,
       state.error,
       state.subscribeToAsset,
       state.unsubscribeFromAsset,
