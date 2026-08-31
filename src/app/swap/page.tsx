@@ -20,9 +20,16 @@ interface ProcessedPathHop {
 }
 
 export default function SwapPage() {
-  const { horizonUrl } = useNetwork();
+  const { horizonUrl, network } = useNetwork();
   const { wallet } = useWalletState();
-  const { slippagePercent } = useSlippageTolerance();
+  const { slippagePercent, setSlippagePercent } = useSlippageTolerance();
+  
+  // Get correct network passphrase based on current network
+  const networkPassphrase = useMemo(() => {
+    return network === "mainnet" 
+      ? "Public Global Stellar Network ; September 2015" 
+      : "Test SDF Network ; September 2015";
+  }, [network]);
   
   const [sourceAsset, setSourceAsset] = useState<Asset>(Asset.native());
   const [destAsset, setDestAsset] = useState<Asset | null>(null);
@@ -150,7 +157,7 @@ export default function SwapPage() {
 
       const transaction = new TransactionBuilder(account, {
         fee: "100",
-        networkPassphrase: "Test SDF Network ; September 2015" // Would get from network context
+        networkPassphrase: networkPassphrase
       })
         .addOperation(Operation.pathPaymentStrictReceive({
           sendAsset: sourceAsset,
