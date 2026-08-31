@@ -137,7 +137,7 @@ export const WalletQRCode = React.memo(function WalletQRCode({
           {truncated}
         </span>
         
-        <span className="relative inline-flex items-center">
+        <span className="relative inline-flex items-center group">
           <button
             type="button"
             onClick={handleCopy}
