@@ -33,7 +33,7 @@ export default function SwapPage() {
   
   const [sourceAsset, setSourceAsset] = useState<Asset>(Asset.native());
   const [destAsset, setDestAsset] = useState<Asset | null>(null);
-  const [sourceAmount, setSourceAmount] = useState<string>("");
+  const [destAmount, setDestAmount] = useState<string>(""); // User enters how much receiver should get (strict receive)
   const [destinationAddress, setDestinationAddress] = useState<string>("");
   const [paths, setPaths] = useState<PathRecord[]>([]);
   const [selectedPath, setSelectedPath] = useState<PathRecord | null>(null);
@@ -193,17 +193,13 @@ export default function SwapPage() {
             <WalletConnectButton />
           </div>
 
-          {/* Source Asset Input */}
+          {/* Source Asset (what you send) */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">You Send</label>
+            <label className="text-sm font-medium text-gray-300">You Send (estimated)</label>
             <div className="flex gap-3">
-              <input
-                type="number"
-                value={sourceAmount}
-                onChange={(e) => setSourceAmount(e.target.value)}
-                placeholder="0.00"
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-xl text-gray-400">
+                {selectedPath ? selectedPath.source_amount : "0.00"}
+              </div>
               <select
                 onChange={(e) => {
                   if (e.target.value === "native") {
