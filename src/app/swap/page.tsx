@@ -233,13 +233,17 @@ export default function SwapPage() {
             />
           </div>
 
-          {/* Destination Asset */}
+          {/* Destination Asset (what receiver gets) */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Receiver Gets</label>
+            <label className="text-sm font-medium text-gray-300">Receiver Gets (exact amount)</label>
             <div className="flex gap-3">
-              <div className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-xl text-gray-400">
-                {selectedPath ? selectedPath.destination_amount : "0.00"}
-              </div>
+              <input
+                type="number"
+                value={destAmount}
+                onChange={(e) => setDestAmount(e.target.value)}
+                placeholder="0.00"
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
               <select
                 onChange={(e) => {
                   if (e.target.value === "native") {
