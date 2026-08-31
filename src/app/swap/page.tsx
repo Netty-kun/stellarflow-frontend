@@ -62,12 +62,13 @@ export default function SwapPage() {
       setError(null);
       try {
         const server = new Horizon.Server(horizonUrl);
-        // For strict receive, we use destination_asset and set source_amount to calculate what we need to send
-        // Wait, actually to get paths where we send sourceAsset and receive destAsset, we use:
-        const pathsResponse = await server.strictReceivePaths(
-          [sourceAsset],
-          destAsset,
-          "1" // We'll use a minimum amount to get all possible paths, then scale
+        // Use strictSendPaths because user is sending a specific amount of sourceAsset,
+        // and we want to find paths that result in receiving destAsset
+        const sourceAmountValue = parseFloat(sourceAmount);
+        const pathsResponse = await server.strictSendPaths(
+          sourceAsset,
+          sourceAmountValue.toString(),
+          [destAsset]
         ).call();
         
         setPaths(pathsResponse.records as PathRecord[]);
@@ -343,7 +344,7 @@ export default function SwapPage() {
                 <button
                   key={percent}
                   onClick={() => {
-                    // In a real app, this would use setSlippagePercent from useSlippageTolerance
+                    setSlippagePercent(percent);
                     setSlippageDialogOpen(false);
                   }}
                   className={`py-2 rounded-lg ${slippagePercent === percent ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
