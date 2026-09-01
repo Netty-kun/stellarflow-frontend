@@ -9,6 +9,8 @@ import {
 // Store active connections and subscriptions
 const connections = new Map<WebSocket, Set<string>>()
 const assetSubscriptions = new Map<string, Set<WebSocket>>()
+const payoutSubscriptions = new Map<string, Set<WebSocket>>()
+const payoutConnections = new Map<WebSocket, Set<string>>()
 
 let wss: WebSocketServer | null = null
 
@@ -55,8 +57,9 @@ function getWebSocketServer() {
   return wss
 }
 interface SocketMessage {
-  type: "subscribe" | "unsubscribe";
+  type: "subscribe" | "unsubscribe" | "subscribePayout" | "unsubscribePayout";
   assetIds?: string[];
+  payoutIds?: string[];
 }
 function handleMessage(ws: WebSocket, data: SocketMessage) {
   const { type, assetIds } = data
@@ -105,6 +108,49 @@ function handleMessage(ws: WebSocket, data: SocketMessage) {
       }
       break
 
+    case 'subscribePayout':
+      if (Array.isArray(data.payoutIds)) {
+        const subscribedPayouts = payoutConnections.get(ws) || new Set()
+
+        data.payoutIds.forEach((payoutId: string) => {
+          subscribedPayouts.add(payoutId)
+
+          if (!payoutSubscriptions.has(payoutId)) {
+            payoutSubscriptions.set(payoutId, new Set())
+          }
+          payoutSubscriptions.get(payoutId)!.add(ws)
+        })
+
+        payoutConnections.set(ws, subscribedPayouts)
+
+        ws.send(JSON.stringify({
+          type: 'payout_subscription_confirmed',
+          payoutIds: data.payoutIds,
+          timestamp: Date.now()
+        }))
+      }
+      break
+
+    case 'unsubscribePayout':
+      if (Array.isArray(data.payoutIds)) {
+        const subscribedPayouts = payoutConnections.get(ws) || new Set()
+
+        data.payoutIds.forEach((payoutId: string) => {
+          subscribedPayouts.delete(payoutId)
+
+          const subscribers = payoutSubscriptions.get(payoutId)
+          if (subscribers) {
+            subscribers.delete(ws)
+            if (subscribers.size === 0) {
+              payoutSubscriptions.delete(payoutId)
+            }
+          }
+        })
+
+        payoutConnections.set(ws, subscribedPayouts)
+      }
+      break
+
     default:
       ws.send(JSON.stringify({
         type: 'error',
@@ -126,6 +172,20 @@ function cleanupConnection(ws: WebSocket) {
       }
     })
     connections.delete(ws)
+  }
+
+  const subscribedPayouts = payoutConnections.get(ws)
+  if (subscribedPayouts) {
+    subscribedPayouts.forEach((payoutId: string) => {
+      const subscribers = payoutSubscriptions.get(payoutId)
+      if (subscribers) {
+        subscribers.delete(ws)
+        if (subscribers.size === 0) {
+          payoutSubscriptions.delete(payoutId)
+        }
+      }
+    })
+    payoutConnections.delete(ws)
   }
 }
 
@@ -239,4 +299,32 @@ setTimeout(simulateOrderBookUpdates, 1200)
 export async function GET(_request: NextRequest) {
   // This is a placeholder - WebSocket upgrade happens in the Next.js server
   return new NextResponse('WebSocket endpoint', { status: 200 })
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const payload = await request.json()
+    const { transactionId, status, error } = payload
+    if (!transactionId || !status) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+    }
+    const subscribers = payoutSubscriptions.get(transactionId)
+    if (subscribers) {
+      const update = {
+        type: 'payout_status_update',
+        transactionId,
+        status,
+        error: error || null,
+        timestamp: Date.now()
+      }
+      subscribers.forEach((ws) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(update))
+        }
+      })
+    }
+    return NextResponse.json({ received: true })
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  }
 }

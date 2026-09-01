@@ -34,6 +34,11 @@ const STEP_DISPLAY: Record<RemittanceStep, StepDisplayMeta> = {
     description: "Funds locked securely on-chain in Stellar escrow.",
     iconId: ICON_IDS.shield,
   },
+  anchor_processing: {
+    label: "Anchor Processing",
+    description: "Off-ramp partner is processing the fiat payout.",
+    iconId: ICON_IDS.clock,
+  },
   anchor_dispatched: {
     label: "Anchor Dispatched",
     description: "Licensed anchor dispatched off-ramp payout instruction.",

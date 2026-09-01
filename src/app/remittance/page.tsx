@@ -42,11 +42,11 @@ export default function RemittancePage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-1">
+      <div className="grid grid-cols-1 gap-6 xl-grid-cols-3">
+        <div className="xl-col-span-1">
           <FxRateTicker />
         </div>
-        <div className="xl:col-span-2">
+        <div className="xl-col-span-2">
           <FxComparisonTable />
         </div>
       </div>
