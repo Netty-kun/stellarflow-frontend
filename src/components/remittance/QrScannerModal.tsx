@@ -23,6 +23,7 @@ export interface QrScannerModalProps {
   defaultAmount?: string;
   defaultAssetCode?: string;
   defaultAssetIssuer?: string;
+  defaultMemo?: string;
 }
 
 const STELLAR_URI_RE =
@@ -57,12 +58,14 @@ function buildStellarUri(
   amount?: string,
   assetCode?: string,
   assetIssuer?: string,
+  memo?: string,
 ): string {
   const params = new URLSearchParams();
   params.set("destination", address);
   if (amount) params.set("amount", amount);
   if (assetCode) params.set("asset_code", assetCode);
   if (assetIssuer) params.set("asset_issuer", assetIssuer);
+  if (memo) params.set("memo", memo);
   return `web+stellar:pay?${params.toString()}`;
 }
 
@@ -74,12 +77,14 @@ export function QrScannerModal({
   defaultAmount = "",
   defaultAssetCode = "XLM",
   defaultAssetIssuer = "",
+  defaultMemo = "",
 }: QrScannerModalProps) {
   const [tab, setTab] = useState<TabMode>("generate");
   const [address, setAddress] = useState(defaultAddress);
   const [amount, setAmount] = useState(defaultAmount);
   const [assetCode, setAssetCode] = useState(defaultAssetCode);
   const [assetIssuer, setAssetIssuer] = useState(defaultAssetIssuer);
+  const [memo, setMemo] = useState(defaultMemo);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -89,7 +94,8 @@ export function QrScannerModal({
   const [scanResult, setScanResult] = useState<StellarPaymentUri | null>(null);
 
   const scannerRef = useRef<HTMLDivElement>(null);
-  const html5QrRef = useRef<unknown>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerControlsRef = useRef<{ stop: () => void } | null>(null);
 
   const isValidAddress = useMemo(
     () => /^G[A-Z2-7]{55}$/.test(address),
@@ -99,9 +105,9 @@ export function QrScannerModal({
   const stellarUri = useMemo(
     () =>
       isValidAddress
-        ? buildStellarUri(address, amount, assetCode, assetIssuer)
+        ? buildStellarUri(address, amount, assetCode, assetIssuer, memo)
         : "",
-    [isValidAddress, address, amount, assetCode, assetIssuer],
+      [isValidAddress, address, amount, assetCode, assetIssuer, memo],
   );
 
   const generateQr = useCallback(async () => {
@@ -140,51 +146,46 @@ export function QrScannerModal({
     }
   }, [stellarUri]);
 
+  const handleDownloadQr = useCallback(() => {
+    if (!qrDataUrl) return;
+    const link = document.createElement("a");
+    link.href = qrDataUrl;
+    link.download = "stellar-payment-request.png";
+    link.click();
+  }, [qrDataUrl]);
+
   const stopScanner = useCallback(async () => {
-    const scanner = html5QrRef.current as
-      | { stop: () => Promise<void>; clear: () => void }
-      | null
-      | undefined;
-    if (scanner) {
-      try {
-        await scanner.stop();
-        scanner.clear();
-      } catch {
-        /* may already be stopped */
-      }
-      html5QrRef.current = null;
+    if (scannerControlsRef.current) {
+      scannerControlsRef.current.stop();
+      scannerControlsRef.current = null;
+    }
+    if (videoRef.current?.srcObject instanceof MediaStream) {
+      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
     }
     setIsScanning(false);
   }, []);
 
   const startScanner = useCallback(async () => {
-    if (!scannerRef.current) return;
+    if (!videoRef.current) return;
     setScanError(null);
     setScanResult(null);
     setIsScanning(true);
 
     try {
-      const { Html5Qrcode } = await import("html5-qrcode");
-      const scannerId = "qr-scanner-viewport";
-
-      scannerRef.current.id = scannerId;
-      const html5Qr = new Html5Qrcode(scannerId);
-      html5QrRef.current = html5Qr;
-
-      await html5Qr.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText: string) => {
-          const payment = parseStellarUri(decodedText);
+      const { BrowserQRCodeReader } = await import("@zxing/library");
+      const reader = new BrowserQRCodeReader();
+      scannerControlsRef.current = await reader.decodeFromVideoDevice(
+        undefined,
+        videoRef.current,
+        (result) => {
+          const payment = result ? parseStellarUri(result.getText()) : null;
           if (payment) {
             setScanResult(payment);
-            html5Qr.stop().then(() => html5Qr.clear()).catch(() => {});
-            html5QrRef.current = null;
+            scannerControlsRef.current?.stop();
+            scannerControlsRef.current = null;
             setIsScanning(false);
           }
-        },
-        () => {
-          /* scan miss — expected while user positions the code */
         },
       );
     } catch {
@@ -334,6 +335,24 @@ export function QrScannerModal({
 
             <div className="space-y-2">
               <label
+                htmlFor="qr-memo"
+                className="text-xs uppercase font-bold text-gray-500"
+              >
+                Memo (optional)
+              </label>
+              <input
+                id="qr-memo"
+                type="text"
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder="Invoice or reference"
+                maxLength={28}
+                className="w-full rounded-lg border border-gray-700 bg-[#0d1117] px-3 py-2.5 text-sm text-gray-200 placeholder:text-gray-600 focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label
                 htmlFor="qr-issuer"
                 className="text-xs uppercase font-bold text-gray-500"
               >
@@ -383,6 +402,14 @@ export function QrScannerModal({
                   />
                   {copied ? "Copied!" : "Copy Payment URI"}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadQr}
+                  className="flex items-center gap-2 rounded-lg border border-blue-500/50 px-4 py-2 text-sm text-blue-300 transition-colors hover:bg-blue-950/40"
+                >
+                  <Icon id={ICON_IDS.download} size={14} />
+                  Download QR image
+                </button>
               </div>
             )}
           </div>
@@ -396,8 +423,15 @@ export function QrScannerModal({
                 <div
                   ref={scannerRef}
                   className="relative mx-auto overflow-hidden rounded-lg border border-gray-800 bg-black"
-                  style={{ minHeight: 300 }}
-                />
+                >
+                  <video
+                    ref={videoRef}
+                    className="block aspect-square w-full max-w-[420px] object-cover"
+                    muted
+                    playsInline
+                    aria-label="Camera preview for scanning a Stellar payment QR code"
+                  />
+                </div>
                 {isScanning && (
                   <p className="text-center text-xs text-gray-400">
                     Point your camera at a Stellar payment QR code...
