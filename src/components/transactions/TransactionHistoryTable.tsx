@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/ToastQueue";
 import { exportTransactionsToCsv, type TaxPlatform } from "@/utils/csvExport";
 import { useTransactionHistoryWithFallback } from "@/app/hooks/useTransactionHistory";
 import type { TransactionRecord, TransactionType } from "@/types/transactions";
+import { TransactionHistoryTableSkeleton } from "@/components/skeletons/TransactionHistoryTableSkeleton";
 
 const TYPE_FILTERS: { label: string; value: "all" | TransactionType }[] = [
   { label: "All Activity", value: "all" },
@@ -82,6 +83,10 @@ export default function TransactionHistoryTable() {
     }
   };
 
+  if (isLoading) {
+    return <TransactionHistoryTableSkeleton />;
+  }
+
   return (
     <div className="overflow-hidden rounded-xl border border-gray-800 bg-[#161b22] text-gray-100">
       <div className="flex flex-col gap-4 border-b border-gray-800 p-4 md:flex-row md:items-center md:justify-between">
@@ -142,11 +147,7 @@ export default function TransactionHistoryTable() {
         <div className="px-6 py-3 text-right font-medium">TxHash</div>
       </div>
 
-      {isLoading ? (
-        <div className="px-6 py-16 text-center text-sm text-gray-500">
-          Loading transaction history…
-        </div>
-      ) : filteredTransactions.length === 0 ? (
+      {filteredTransactions.length === 0 ? (
         <div className="px-6 py-16 text-center text-sm text-gray-500">
           No transactions match this filter.
         </div>
@@ -158,32 +159,31 @@ export default function TransactionHistoryTable() {
           >
             <div className="px-6 py-4 text-gray-400">{formatDate(tx.date)}</div>
             <div className="px-6 py-4 capitalize text-gray-200">{tx.type}</div>
-            <div className="px-6 py-4 text-gray-200">
-              {tx.sentAmount.toLocaleString()} {tx.sentCurrency}
+            <div className="px-6 py-4 text-gray-300">
+              {tx.sentAmount} {tx.sentCurrency}
             </div>
-            <div className="px-6 py-4 text-gray-200">
-              {tx.receivedAmount.toLocaleString()} {tx.receivedCurrency}
+            <div className="px-6 py-4 text-gray-300">
+              {tx.receivedAmount} {tx.receivedCurrency}
             </div>
             <div className="px-6 py-4 text-gray-400">
               {tx.fee} {tx.feeCurrency}
             </div>
-            <div className="flex items-center justify-end gap-2 px-6 py-4">
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${STATUS_STYLES[tx.status]}`}
+            <div className="px-6 py-4 text-right">
+              <a
+                href={`https://stellar.expert/explorer/public/tx/${tx.txHash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-blue-400 hover:underline"
               >
-                {tx.status}
-              </span>
-              <span className="text-blue-500">{truncateHash(tx.txHash)}</span>
+                {truncateHash(tx.txHash)}
+                <span className={`ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-sans font-medium uppercase ${STATUS_STYLES[tx.status]}`}>
+                  {tx.status}
+                </span>
+              </a>
             </div>
           </div>
         ))
       )}
-
-      <div className="flex items-center justify-between border-t border-gray-800 p-4 text-sm text-gray-500">
-        <span>
-          Showing {filteredTransactions.length} of {transactions.length} transactions
-        </span>
-      </div>
     </div>
   );
 }
