@@ -130,3 +130,100 @@ export function computeSparklinePoints(
   }
   return out;
 }
+
+export interface TimePointValue {
+  time: number;
+  value: number;
+}
+
+/**
+ * Calculates a Simple Moving Average (SMA) across timestamped price points.
+ * Returns only data points starting where enough history exists for the window period.
+ */
+export function calculateSimpleMovingAverage(
+  data: readonly { time: number; close: number }[],
+  period: number = 20,
+): TimePointValue[] {
+  if (data.length < period || period <= 0) {
+    return [];
+  }
+
+  const results: TimePointValue[] = [];
+  let sum = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    sum += data[i].close;
+
+    if (i >= period) {
+      sum -= data[i - period].close;
+    }
+
+    if (i >= period - 1) {
+      results.push({
+        time: data[i].time,
+        value: Number((sum / period).toFixed(6)),
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Calculates the Relative Strength Index (RSI) using Wilder's smoothed method.
+ * Standard period is 14. Output values range between 0 and 100.
+ */
+export function calculateRSI(
+  data: readonly { time: number; close: number }[],
+  period: number = 14,
+): TimePointValue[] {
+  if (data.length <= period || period <= 0) {
+    return [];
+  }
+
+  const results: TimePointValue[] = [];
+  let gains = 0;
+  let losses = 0;
+
+  // First period average gain / loss
+  for (let i = 1; i <= period; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    if (diff >= 0) {
+      gains += diff;
+    } else {
+      losses += Math.abs(diff);
+    }
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  let rsi = avgLoss === 0 ? 100 : 100 - 100 / (1 + rs);
+
+  results.push({
+    time: data[period].time,
+    value: Number(rsi.toFixed(2)),
+  });
+
+  // Wilder's smoothing for subsequent periods
+  for (let i = period + 1; i < data.length; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    const currentGain = diff > 0 ? diff : 0;
+    const currentLoss = diff < 0 ? Math.abs(diff) : 0;
+
+    avgGain = (avgGain * (period - 1) + currentGain) / period;
+    avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
+
+    rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsi = avgLoss === 0 ? 100 : 100 - 100 / (1 + rs);
+
+    results.push({
+      time: data[i].time,
+      value: Number(rsi.toFixed(2)),
+    });
+  }
+
+  return results;
+}
+
