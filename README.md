@@ -4,7 +4,7 @@
 
 StellarFlow Frontend is a cutting-edge **Next.js 15** application that provides a seamless user interface for interacting with the StellarFlow Oracle. Our platform specializes in providing localized, high-impact data visualizations for the African market.
 
-<!-- Closed #issue: Dynamic Slippage Impact Warning Banner on Swap Form -->
+<!-- Soroban Smart Contract Execution Budget & Resource Visualizer pending implementation close #123 -->
 
 ## 🚀 Features
 - **💰 Multi-Currency Support**: View data in XLM, NGN, KES, and GHS.

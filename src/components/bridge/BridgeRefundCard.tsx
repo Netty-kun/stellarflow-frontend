@@ -4,6 +4,7 @@ import React from "react";
 import Icon from "@/components/icons/Icon";
 import { ICON_IDS } from "@/components/icons/iconIds";
 import { BridgeUnlockStepper } from "@/components/bridge/BridgeUnlockStepper";
+import { BridgeSignatureStatus } from "@/components/bridge/BridgeSignatureStatus";
 import type { RefundProgress } from "@/hooks/useBridgeRefunds";
 import {
   FAILURE_REASON_LABELS,
@@ -46,6 +47,17 @@ export function BridgeRefundCard({
 
   const currentStage = progress?.currentStage ?? transfer.unlockStage;
   const stageCompleted = progress?.stageCompleted ?? isRefunded;
+  const signatureStatus = progress
+    ? {
+        gatheredSignatures: progress.gatheredSignatures,
+        requiredSignatures: progress.requiredSignatures,
+        validators: progress.validators,
+      }
+    : {
+        gatheredSignatures: isRefunded ? 3 : 0,
+        requiredSignatures: transfer.signatureThreshold,
+        validators: [],
+      };
 
   return (
     <div className="rounded-xl border border-gray-800 bg-[#161b22] p-4">
@@ -102,6 +114,8 @@ export function BridgeRefundCard({
           {progress.error}
         </div>
       )}
+
+      <BridgeSignatureStatus {...signatureStatus} />
 
       {(currentStage || isInProgress) && (
         <div className="mt-4">
