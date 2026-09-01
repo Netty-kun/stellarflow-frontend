@@ -20,6 +20,7 @@ import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { HapticProvider } from "@/components/providers/HapticProvider";
 import { PushNotificationRoot } from "@/components/notifications";
 import { RpcFailoverMonitor } from "./components/providers/RpcFailoverMonitor";
+import { CommandPalette } from "@/components/command-palette";
 
 export const metadata: Metadata = {
   title: "StellarFlow Network Dashboard",
@@ -148,6 +149,7 @@ export default async function RootLayout({
                       </ToastProvider>
                       <SwUpdateBanner />
                       <InstallBanner />
+                      <CommandPalette />
                   </ProgressBarProvider>
                 </QueryProvider>
               </UserProvider>

@@ -326,6 +326,18 @@ export class RpcManager {
       this.currentUrl = next?.url ?? '';
     }
   }
+
+  /**
+   * Switch the active RPC endpoint to the given URL. If the endpoint is not
+   * already configured it will be added automatically.
+   */
+  setCurrentUrl(url: string): void {
+    if (!this.endpoints.some((e) => e.url === url)) {
+      this.addEndpoint({ url, priority: 1, network: this.activeNetwork });
+    }
+    this.currentUrl = url;
+    this.consecutiveErrors = 0;
+  }
 }
 
 export const rpcManager = new RpcManager();
