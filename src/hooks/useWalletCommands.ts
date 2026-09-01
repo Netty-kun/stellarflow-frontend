@@ -114,6 +114,16 @@ export function useWalletCommands({
       },
     });
 
+    commands.push({
+      id: "action:fund-account",
+      kind: "action",
+      title: "Fund Account / Buy Crypto",
+      subtitle: "On-ramp fiat to Stellar assets directly",
+      keywords: ["fund", "buy", "crypto", "fiat", "onramp", "moonpay", "transak", "deposit"],
+      iconId: ICON_IDS.creditCard,
+      href: "/remittance",
+    });
+
     return commands;
   }, [wallet, refreshWalletState, onResult]);
 }
