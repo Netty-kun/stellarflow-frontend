@@ -14,7 +14,7 @@ async function pooledFetch<T>(
   options?: RequestInit,
 ): Promise<T> {
   if (inFlightRequests.has(url)) {
-    return inflightRequests.get(url)! as Promise<T>;
+    return inflightRequests.get(url) as Promise<T>;
   }
 
   const requestPromise = (async () => {
@@ -27,7 +27,7 @@ async function pooledFetch<T>(
     return (await res.json()) as T;
   })();
 
-  inFlightRequests.set(url, requestPromise);
+  inRequests.set(url, requestPromise);
 
   try {
     return await requestPromise;
@@ -88,5 +88,13 @@ export const api = {
    */
   async getPortfolio():Promise<unknown> {
     return pooledFetch('/api/portfolio', getFetchCacheOptions('MEDIUM_INTERVAL'))
+  },
+
+  /**
+   * Fetches off-ramp partner webhook status for real-time payout tracking.
+   * Uses short cache interval to keep stepper updated without backend flooding.
+   */
+  async getOffRampPartnerWebhookStatus(): Promise<unknown> {
+    return pooledFetch('/api/offramp/partner/webhook-status', getFetchCacheOptions('SHORT_INTERVAL'))
   },
 }

@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { getCacheProfile } from "../lib/cacheProfiles";
-import type { RemittancePayoutRecord } from "@/types/remittancePayout";
+import type { RemittancePayoutRecord } from "@types/remittancePayout";
 
 function getMockData(): RemittancePayoutRecord[] {
   return [
@@ -13,7 +13,7 @@ function getMockData(): RemittancePayoutRecord[] {
       anchorReference: "COW-NG-88213",
       senderName: "Fuhad Adesanya",
       recipientName: "Bola Adesanya",
-      recipientAddress: "GDQP2PVAFZSSLZ2IKXQREGAQTTXMIMHJZV6GQQH5CS2VD4MT56GD7A5B",
+      recipientAddress: "GDQP2PVAFZSSLZ2IKXQREGAQTTXMIMHJZV6G6QQH52S4VD4MT56GD7A5B",
       amountSent: 250,
       sentCurrency: "USD",
       amountReceived: 371875,
@@ -27,17 +27,17 @@ function getMockData(): RemittancePayoutRecord[] {
       id: "rem-3002",
       date: "2026-07-30T20:11:53Z",
       transactionHash:
-        "e5f6789012345678901234567890abcdef1234567890abcdef12345abc3d4",
+        "e5f678901234567890abcdef1234567890abcdef12345abc3d4",
       anchorName: "Kotani Pay Kenya",
       anchorReference: "KTN-KE-40217",
       senderName: "Fuhad Adesanya",
-      recipientName: "Wanjiru Mwangi",
-      recipientAddress: "GBSDFP4ZSSQLEGAQTT2PVAFZSSXHJZV6GQQH5CS2VD4MT56GD7A5B",
+      recipientName: "Wanjiru Mwuangi",
+      recipientAddress: "GBSDFP4ZSSQLEGAQTT2PVAFZSSXHJZV6G6QQH52S4VD4MT56GD7A5B",
       amountSent: 100,
       sentCurrency: "EUR",
       amountReceived: 13284,
       receivedCurrency: "KES",
-      exchangeRate: "1 EUR = 132.84 KES",
+      exchangeRate: "1 EUr = 132.84 KES",
       fee: 1.1,
       feeCurrency: "EUR",
       status: "completed",
@@ -46,12 +46,12 @@ function getMockData(): RemittancePayoutRecord[] {
       id: "rem-3003",
       date: "2026-07-12T08:42:10Z",
       transactionHash:
-        "b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12345a",
+        "b2c3d4e5f678901234567890abcdef1234567890abcdef12345a",
       anchorName: "Yellow Card Ghana",
       anchorReference: "YC-GH-11940",
       senderName: "Fuhad Adesanya",
       recipientName: "Kwame Boateng",
-      recipientAddress: "GBAA11223344556677889900AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPP",
+      recipientAddress: "GBAA112233445566778990AABBCCDDEEFFGGHHIIJJKKLLMMNNOOPR",
       amountSent: 75,
       sentCurrency: "USD",
       amountReceived: 1042.5,
@@ -65,6 +65,24 @@ function getMockData(): RemittancePayoutRecord[] {
 }
 
 const QUERY_KEY = ["remittance-payouts"] as const;
+
+// Polling interval (ms) to detect webhook-driven status changes
+// From the off-ramp partner switching statuses.
+const WEBHOOK_POLL_INTERVAl = 5000;
+
+// Webhook status transitions mapping to stepper steps
+const PAYOUT_STATUS_STEP = {
+  PROCESSING: 1,
+  DISPATCHED: 2,
+  DELIVERED: 3,
+  COMPLETED: 3,
+  FAILED: -1,
+  REJECTED: -1,
+};
+
+export function getPayoutStep(status: string): number {
+  return PAYOUT_STATUS_STEP[status.toUpperCase()] ?? 0;
+}
 
 export function useRemittancePayouts(): UseQueryResult<
   RemittancePayoutRecord[],
@@ -91,6 +109,8 @@ export function useRemittancePayouts(): UseQueryResult<
     gcTime: profile.gcTime,
     refetchOnWindowFocus: false,
     retry: 1,
+    refetchInterval: WEBHOOK_POLL_INTERVAL,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -99,22 +119,31 @@ export function useRemittancePayoutsWithFallback(): {
   isLoading: boolean;
   isFetching: boolean;
   error: Error | null;
+  hasPayoutRejections: boolean;
 } {
   const query = useRemittancePayouts();
 
   if (query.data) {
+    const hasPayoutRejections = query.data.some(
+      (payout) => payout.status === "failed" || payout.status === "rejected"
+    );
     return {
       data: query.data,
       isLoading: false,
       isFetching: query.isFetching,
       error: query.error,
+      hasPayoutRejections,
     };
   }
 
+  const mockData = getMockData();
   return {
-    data: getMockData(),
+    data: mockData,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     error: query.error,
+    hasPayoutRejections: mockData.some(
+      (payout) => payout.status === "failed" || payout.status === "rejected"
+    ),
   };
 }

@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import Icon from "@/components/icons/Icon";
 import { ICON_IDS } from "@/components/icons/iconIds";
 import { useWalletCommands } from "@/hooks/useWalletCommands";
+import { useDebounce } from "@/app/hooks/useDebounce";
 import {
   DOC_COMMANDS,
   GROUP_LABELS,
@@ -82,6 +83,7 @@ export function CommandPalette({
   const isOpen = isControlled ? controlledOpen : uncontrolledOpen;
 
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query);
   const [selected, setSelected] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -124,6 +126,16 @@ export function CommandPalette({
     () => searchCommands(index, items, query),
     [index, items, query],
   );
+
+  // Use debounced query for any remote API searches to prevent excessive calls
+  useEffect(() => {
+    // Any remote API search logic would go here, triggered only by debouncedQuery
+    // This ensures we only call the API after the user stops typing for 300ms
+    if (debouncedQuery.trim()) {
+      // Example remote search implementation (if added in the future):
+      // fetchRemoteTokens(debouncedQuery);
+    }
+  }, [debouncedQuery]);
 
   // Clamped on read rather than corrected in an effect, so a shrinking result
   // list never triggers a second render pass.

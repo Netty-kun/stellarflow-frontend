@@ -214,6 +214,18 @@ export const NAVIGATION_COMMANDS: readonly CommandItem[] = [
     iconId: ICON_IDS.shield,
     href: "/admin/settings",
   },
+  {
+    id: "page:rpc-benchmark",
+    kind: "page",
+    title: "RPC Benchmark",
+    subtitle: "/rpc-benchmark",
+    keywords: [
+      "rpc", "endpoint", "latency", "speed", "benchmark", "soroban",
+      "node", "ping", "fastest", "network", "performance", "private",
+    ],
+    iconId: ICON_IDS.signal,
+    href: "/rpc-benchmark",
+  },
 ];
 
 /**

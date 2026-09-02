@@ -29,6 +29,22 @@ import Icon from "@/components/icons/Icon";
 import { ICON_IDS } from "@/components/icons/iconIds";
 
 // ---------------------------------------------------------------------------
+// Off-ramp partner webhook status monitor
+// ---------------------------------------------------------------------------
+
+const OFF_RAMP_ACTIVE_STATUSES = new Set([
+  "PROCESSING",
+  "DISPATCHED",
+  "DELIVERED",
+]);
+
+interface OffRampWebhookPayload {
+  txId: string;
+  status: "PROCESSING" | "DISPATCHED" | "DELIVERED" | "REJECTED" | "FAILED";
+  message?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Demo / development helpers
 // ---------------------------------------------------------------------------
 
@@ -133,6 +149,40 @@ function LivePage({ txId }: { txId: string }) {
       pollIntervalMs: 5_000,
       stopOnDelivered: true,
     });
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+    if (!apiUrl) return;
+
+    const events = new EventSource(
+      `${apiUrl}/remittance/${encodeURIComponent(txId)}/offramp/events`,
+    );
+
+    events.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data as string) as OffRampWebhookPayload;
+        if (typeof payload.txId === "string" && payload.txId !== txId) return;
+
+        if (OFF_RAMP_ACTIVE_STATUSES.has(payload.status)) {
+          setWebhookError(null);
+          refetch();
+        } else if (payload.status === "REJECTED" || payload.status === "FAILED") {
+          setWebhookError(
+            payload.message ?? "Off-ramp partner rejected the payout.",
+          );
+        }
+      } catch {
+        // Ignore malformed webhook events.
+      }
+    };
+
+    events.onerror = () => {
+      // EventSource reconnects automatically; keep the last known state.
+    };
+
+    return () => events.close();
+  }, [txId, refetch]);
 
   return (
     <PageShell txId={txId}>
@@ -140,7 +190,7 @@ function LivePage({ txId }: { txId: string }) {
         status={status}
         isConnected={isConnected}
         isPolling={isPolling}
-        error={error}
+        error={error ?? webhookError}
         onRefetch={refetch}
         network={
           process.env.NEXT_PUBLIC_STELLAR_NETWORK === "testnet"
