@@ -3,17 +3,27 @@
 import React from 'react';
 import type { SorobanResourceMetrics, SorobanBudgetLimits } from '@/types/sorobanBudget';
 import { DEFAULT_SOROBAN_LIMITS } from '@/types/sorobanBudget';
+import { ContractVersionBadge } from '@/components/contracts/ContractVersionBadge';
 
 interface SorobanBudgetVisualizerProps {
   metrics: SorobanResourceMetrics;
   limits?: SorobanBudgetLimits;
   className?: string;
+  /** Optional contract id to surface its version badge next to the title. */
+  contractId?: string;
+  /** Optional static version tag when no live contract id applies. */
+  version?: string;
+  /** Optional pre-known wasm hash fast-path for the badge. */
+  contractWasmHash?: string;
 }
 
 export const SorobanBudgetVisualizer = React.memo(function SorobanBudgetVisualizer({
   metrics,
   limits = DEFAULT_SOROBAN_LIMITS,
   className = '',
+  contractId,
+  version,
+  contractWasmHash,
 }: SorobanBudgetVisualizerProps) {
   const cpuRatio = Math.min(100, (metrics.cpuInstructions / limits.maxCpuInstructions) * 100);
   const memBytes = metrics.memoryBytes || ((metrics.writeBytes || 0) + (metrics.readBytes || 0));
@@ -30,8 +40,18 @@ export const SorobanBudgetVisualizer = React.memo(function SorobanBudgetVisualiz
 
   return (
     <div className={`p-4 rounded-xl bg-slate-900 border border-slate-800 text-white space-y-4 ${className}`}>
-      <div className="flex justify-between items-center">
-        <h3 className="font-semibold text-lg">Soroban Execution Budget & Resources</h3>
+      <div className="flex justify-between items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <h3 className="font-semibold text-lg">Soroban Execution Budget &amp; Resources</h3>
+          <ContractVersionBadge
+            contractId={contractId}
+            version={version}
+            fallbackWasmHash={contractWasmHash}
+            showHash={Boolean(contractWasmHash && !version)}
+            showKind
+            hideOnError
+          />
+        </div>
         <span className="text-xs text-slate-400 font-mono">Dry-run Simulation</span>
       </div>
 
